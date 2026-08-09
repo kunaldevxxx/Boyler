@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run go vet
+        run: go vet ./cmd/... ./internal/... ./pkg/...
+
+      - name: Run tests
+        run: go test -race -count=1 ./cmd/... ./internal/... ./pkg/...
+
+      - name: Build Boyler binaries
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+
+          go build -trimpath \
+            -o dist/boyler \
+            ./cmd/boyler
+
+          go build -trimpath \
+            -o dist/myrunc \
+            ./cmd/myrunc
+
+          go build -trimpath \
+            -o dist/daemon_boyler_linux \
+            ./cmd/boylerd
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: boyler-linux-amd64-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
