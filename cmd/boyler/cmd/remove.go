@@ -6,7 +6,6 @@ import (
 	"time"
 
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
-	utils "boyler/cmd/boyler/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -18,13 +17,12 @@ var removeCmd = &cobra.Command{
 	Use:   "remove [CONTAINER_ID]",
 	Short: "Remove a container",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		id := args[0]
 		client, conn, err := NewGrpcDaemonClient()
 		if err != nil {
-			fmt.Printf("Error connecting to daemon: %v\n", err)
-			return
+			return commandError(err)
 		}
 		defer conn.Close()
 
@@ -32,12 +30,11 @@ var removeCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		res, err := client.RemoveContainer(ctx, req)
+		_, err = client.RemoveContainer(ctx, req)
 		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
-			return
+			return commandError(err)
 		}
-		fmt.Printf("Container removed\n")
-		utils.PrintProtoJSON(res)
+		fmt.Fprintln(cmd.OutOrStdout(), id)
+		return nil
 	},
 }

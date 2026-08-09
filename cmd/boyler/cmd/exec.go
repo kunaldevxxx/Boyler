@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"regexp"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -22,38 +21,37 @@ var (
 
 var execCmd = &cobra.Command{
 	Use:   "exec <container>",
-	Short: "Execute shell inside container and stream from daemon. To escape send SIGTERM signal (Ctrl+C)",
+	Short: "Execute a command in a running container",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		loadEnv()
 		containerID := args[0]
 		client, conn, err := NewGrpcDaemonClient()
 		if err != nil {
-			fmt.Printf("Error connecting to daemon: %v\n", err)
+			fmt.Fprintln(cmd.ErrOrStderr(), commandError(err))
 			return
-		} 
+		}
 		defer conn.Close()
 
 		streamCtx, cancel := context.WithCancel(context.Background())
 		stream, err := client.AttachContainer(streamCtx)
-		if err != nil{
-			fmt.Printf("Error open stream with deamon: %v", err)
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), commandError(err))
 			cancel()
 			return
 		}
 
 		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan,syscall.SIGTERM, os.Interrupt)
+		signal.Notify(sigChan, syscall.SIGTERM, os.Interrupt)
 		go func() {
 			<-sigChan
-			fmt.Printf("Streaming end\n")
 			cancel()
 		}()
 
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go commandInput(stream, &wg, containerID, streamCtx)
-		go receiveOutput(stream, &wg)
+		go receiveOutput(stream, &wg, cmd.OutOrStdout())
 		wg.Wait()
 	},
 }
@@ -64,9 +62,7 @@ func init() {
 	execCmd.Flags().BoolVarP(&tty, "tty", "t", false, "Allocate a pseudo-TTY")
 }
 
-
-
-func receiveOutput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse], wg *sync.WaitGroup) {
+func receiveOutput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse], wg *sync.WaitGroup, output io.Writer) {
 	defer wg.Done()
 	for {
 		resp, err := stream.Recv()
@@ -74,16 +70,13 @@ func receiveOutput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachRe
 			return
 		}
 		if err != nil {
-			fmt.Printf("Streaming terminated")
 			return
 		}
-		fmt.Printf("%s\n", cleanANSI(resp.GetStdout()))
+		_, _ = output.Write(resp.GetStdout())
 	}
 }
 
-
-
-func commandInput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse],wg *sync.WaitGroup,id string,ctx context.Context){
+func commandInput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse], wg *sync.WaitGroup, id string, ctx context.Context) {
 	defer wg.Done()
 	req := &pb.AttachRequest{
 		Payload: &pb.AttachRequest_Init{
@@ -134,10 +127,4 @@ func readBuf(ch chan mes) {
 		}
 		ch <- mes{ok: true, buf: buf[:n]}
 	}
-}
-
-var csiRegexp = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
-
-func cleanANSI(data []byte) []byte {
-    return csiRegexp.ReplaceAll(data, []byte{})
 }

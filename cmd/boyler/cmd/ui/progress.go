@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -11,15 +12,20 @@ type ProgressMsg struct {
 	ID       string
 	Status   string
 	Progress float64
+	Current  int64
+	Total    int64
 }
 
-type DoneMsg struct{
+type DoneMsg struct {
 	Image string
+	Err   error
 }
 
 type layer struct {
 	status   string
 	progress float64
+	current  int64
+	total    int64
 }
 
 type Model struct {
@@ -27,6 +33,8 @@ type Model struct {
 	order  []string
 	layers map[string]*layer
 	done   bool
+	err    error
+	image  string
 }
 
 func New(events <-chan tea.Msg) Model {
@@ -61,10 +69,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		l.status = msg.Status
 		l.progress = msg.Progress
+		l.current = msg.Current
+		l.total = msg.Total
 		return m, waitForMsg(m.events)
 
 	case DoneMsg:
-		m.done = true
+		m.done = msg.Err == nil
+		m.err = msg.Err
+		m.image = msg.Image
 		return m, tea.Quit
 
 	case tea.KeyMsg:
@@ -84,11 +96,22 @@ var (
 
 func renderBar(progress float64) string {
 	filled := int(progress * barWidth)
+	if filled < 0 {
+		filled = 0
+	}
 	if filled > barWidth {
 		filled = barWidth
 	}
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
-	return barStyle.Render(bar)
+	if filled == barWidth {
+		return barStyle.Render(strings.Repeat("=", barWidth))
+	}
+	completed := strings.Repeat("=", filled)
+	marker := ""
+	if filled > 0 {
+		marker = ">"
+	}
+	remaining := strings.Repeat(" ", barWidth-filled-len(marker))
+	return barStyle.Render(completed+marker) + remaining
 }
 
 func (m Model) View() string {
@@ -96,14 +119,43 @@ func (m Model) View() string {
 	for _, id := range m.order {
 		l := m.layers[id]
 		if l.status == "Pull complete" {
-			b.WriteString(doneStyle.Render(fmt.Sprintf("%s Pull complete", id)) + "\n")
+			b.WriteString(doneStyle.Render(fmt.Sprintf("%s: Pull complete", id)) + "\n")
 			continue
 		}
-		b.WriteString(fmt.Sprintf("%s %-15s %s %3.0f%%\n",
-			id, l.status, renderBar(l.progress), l.progress*100))
+		b.WriteString(fmt.Sprintf("%s: %-11s [%s] %s/%s\n",
+			id, l.status, renderBar(l.progress), humanSize(l.current), humanSize(l.total)))
 	}
 	if m.done {
-		b.WriteString("\n" + doneStyle.Render("Status: Downloaded newer image") + "\n")
+		b.WriteString("\n" + doneStyle.Render(fmt.Sprintf("Status: Downloaded newer image for %s", displayImage(m.image))) + "\n")
 	}
 	return b.String()
+}
+
+func displayImage(value string) string {
+	value = strings.TrimPrefix(value, "docker.io/")
+	lastSlash := strings.LastIndex(value, "/")
+	if strings.LastIndex(value, ":") <= lastSlash {
+		return value + ":latest"
+	}
+	return value
+}
+
+func (m Model) Err() error {
+	return m.err
+}
+
+func humanSize(value int64) string {
+	if value < 0 {
+		return "?"
+	}
+	const unit = 1000
+	if value < unit {
+		return fmt.Sprintf("%dB", value)
+	}
+	div, exp := int64(unit), 0
+	for n := value / unit; n >= unit && exp < 3; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.2f%cB", float64(value)/float64(div), "kMGT"[exp])
 }

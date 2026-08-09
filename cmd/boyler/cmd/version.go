@@ -14,8 +14,9 @@ func init() {
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show current version of app",
+	Short: "Show version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Current version - %v\n", os.Getenv("VERSION"))
+		loadEnv()
+		fmt.Fprintf(cmd.OutOrStdout(), "Boyler version %s\n", os.Getenv("VERSION"))
 	},
 }
