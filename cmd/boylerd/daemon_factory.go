@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	service "boyler/internal/daemon/application/container_service"
 	imageservice "boyler/internal/daemon/application/image_service"
 	networkservice "boyler/internal/daemon/application/network_service"
+	systemservice "boyler/internal/daemon/application/system_service"
 	image "boyler/internal/daemon/infrastructure/outbound/image"
 	layer "boyler/internal/daemon/infrastructure/outbound/layer"
 	limits "boyler/internal/daemon/infrastructure/outbound/limits"
@@ -15,6 +17,7 @@ import (
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
 	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	systeminspector "boyler/internal/daemon/infrastructure/outbound/system"
 	runtime "boyler/internal/runtime/myrunc"
 	"boyler/pkg/logger"
 )
@@ -23,6 +26,8 @@ type DaemonConfig struct {
 	ImagesPath     string
 	ContainersPath string
 	RuntimeBinPath string
+	ShimBinPath    string
+	StatePath      string
 
 	Network        networkservice.NetworkServiceConfig
 	NetworkManager network.Config
@@ -61,6 +66,8 @@ func NewDaemonFactoryFromEnv() *DaemonFactory {
 		ImagesPath:     imagesPath,
 		ContainersPath: containersPath,
 		RuntimeBinPath: envOr(root, os.Getenv("BIN_MYRUNC")),
+		ShimBinPath:    optionalPath(root, os.Getenv("BIN_SHIM")),
+		StatePath:      optionalPath(root, os.Getenv("STATE_PATH")),
 		NetworkManager: network.Config{
 			Eth0:    os.Getenv("DEFAULT_ETH0"),
 			Forward: os.Getenv("IP_FORWARDING_PATH"),
@@ -77,6 +84,17 @@ func NewDaemonFactoryFromEnv() *DaemonFactory {
 			SystemPath:   os.Getenv("SYSTEM_PATH"),
 		},
 	})
+}
+
+func (d *DaemonFactory) NewSystemService(startedAt time.Time) (systemservice.Service, error) {
+	if d == nil {
+		return nil, fmt.Errorf("daemon factory is nil")
+	}
+	inspector := systeminspector.NewInspector(systeminspector.Config{
+		RuntimePath: d.config.RuntimeBinPath, ImagesPath: d.config.ImagesPath,
+		ContainersPath: d.config.ContainersPath, ShimPath: d.config.ShimBinPath, StatePath: d.config.StatePath,
+	})
+	return systemservice.New(inspector, startedAt), nil
 }
 
 func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) {
@@ -116,6 +134,16 @@ func (d *DaemonFactory) NewImageService() (imageservice.ImageService, error) {
 }
 
 func envOr(node1 string, node2 string) string { return filepath.Join(node1, node2) }
+
+func optionalPath(root, value string) string {
+	if value == "" {
+		return ""
+	}
+	if filepath.IsAbs(value) {
+		return filepath.Clean(value)
+	}
+	return filepath.Join(root, value)
+}
 
 func workingDirectory() string {
 	wd, err := os.Getwd()

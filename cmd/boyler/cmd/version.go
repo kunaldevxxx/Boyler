@@ -33,6 +33,7 @@ var versionCmd = &cobra.Command{
 		theme := ui.NewTheme(cmd.OutOrStdout(), colorMode.value)
 		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", theme.Gradient("Boyler"), theme.Brand(info.Version))
 		fmt.Fprintf(cmd.OutOrStdout(), "  commit: %s\n  built:  %s\n  target: %s/%s\n", info.Commit, info.BuildDate, info.OS, info.Arch)
+		fmt.Fprintf(cmd.OutOrStdout(), "  API:    %s\n  state:  %s\n  runtime:%s\n", info.APIVersion, info.StateVersion, info.RuntimeVersion)
 		return nil
 	},
 }

@@ -53,6 +53,7 @@ message SystemInfoResponse {
   string containers_path = 13;
   string daemon_started_at = 14;
   int64 daemon_uptime_seconds = 15;
+  int32 daemon_pid = 16;
 }
 
 message DoctorRequest {}
@@ -240,4 +241,3 @@ message ContainerListItem {
 
 message PsRequest {
 }
-

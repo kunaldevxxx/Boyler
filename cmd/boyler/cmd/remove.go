@@ -27,7 +27,7 @@ var removeCmd = &cobra.Command{
 		defer conn.Close()
 
 		req := &pb.RemoveRequest{ContainerId: id}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
 		_, err = client.RemoveContainer(ctx, req)

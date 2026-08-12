@@ -126,6 +126,7 @@ type SystemInfoResponse struct {
 	ContainersPath      string                 `protobuf:"bytes,13,opt,name=containers_path,json=containersPath,proto3" json:"containers_path,omitempty"`
 	DaemonStartedAt     string                 `protobuf:"bytes,14,opt,name=daemon_started_at,json=daemonStartedAt,proto3" json:"daemon_started_at,omitempty"`
 	DaemonUptimeSeconds int64                  `protobuf:"varint,15,opt,name=daemon_uptime_seconds,json=daemonUptimeSeconds,proto3" json:"daemon_uptime_seconds,omitempty"`
+	DaemonPid           int32                  `protobuf:"varint,16,opt,name=daemon_pid,json=daemonPid,proto3" json:"daemon_pid,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -261,6 +262,13 @@ func (x *SystemInfoResponse) GetDaemonStartedAt() string {
 func (x *SystemInfoResponse) GetDaemonUptimeSeconds() int64 {
 	if x != nil {
 		return x.DaemonUptimeSeconds
+	}
+	return 0
+}
+
+func (x *SystemInfoResponse) GetDaemonPid() int32 {
+	if x != nil {
+		return x.DaemonPid
 	}
 	return 0
 }
@@ -2174,7 +2182,7 @@ var File_daemon_proto protoreflect.FileDescriptor
 const file_daemon_proto_rawDesc = "" +
 	"\n" +
 	"\fdaemon.proto\x12\x06daemon\"\x13\n" +
-	"\x11SystemInfoRequest\"\x9a\x04\n" +
+	"\x11SystemInfoRequest\"\xb9\x04\n" +
 	"\x12SystemInfoResponse\x12\x0e\n" +
 	"\x02os\x18\x01 \x01(\tR\x02os\x12\"\n" +
 	"\farchitecture\x18\x02 \x01(\tR\farchitecture\x12\x16\n" +
@@ -2194,7 +2202,9 @@ const file_daemon_proto_rawDesc = "" +
 	"imagesPath\x12'\n" +
 	"\x0fcontainers_path\x18\r \x01(\tR\x0econtainersPath\x12*\n" +
 	"\x11daemon_started_at\x18\x0e \x01(\tR\x0fdaemonStartedAt\x122\n" +
-	"\x15daemon_uptime_seconds\x18\x0f \x01(\x03R\x13daemonUptimeSeconds\"\x0f\n" +
+	"\x15daemon_uptime_seconds\x18\x0f \x01(\x03R\x13daemonUptimeSeconds\x12\x1d\n" +
+	"\n" +
+	"daemon_pid\x18\x10 \x01(\x05R\tdaemonPid\"\x0f\n" +
 	"\rDoctorRequest\"\xb5\x01\n" +
 	"\x0fDiagnosticCheck\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1c\n" +
