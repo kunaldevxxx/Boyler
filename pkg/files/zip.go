@@ -7,7 +7,6 @@ import (
 	"os/exec"
 )
 
-
 func Unzip(src string, dest string) error {
 	if err := os.MkdirAll(dest, 0755); err != nil {
 		return fmt.Errorf("failed to create dest directory: %w", err)

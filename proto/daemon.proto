@@ -28,6 +28,70 @@ service ImageService {
   rpc ListImages (ListImagesRequest) returns (ListImagesResponse);
 }
 
+// DaemonInspectionService exposes read-only daemon and host diagnostics.
+service DaemonInspectionService {
+  rpc SystemInfo(SystemInfoRequest) returns (SystemInfoResponse);
+  rpc Doctor(DoctorRequest) returns (DoctorResponse);
+  rpc Version(VersionRequest) returns (VersionResponse);
+}
+
+message SystemInfoRequest {}
+
+message SystemInfoResponse {
+  string os = 1;
+  string architecture = 2;
+  string kernel = 3;
+  string hostname = 4;
+  string go_version = 5;
+  string cgroup_version = 6;
+  repeated string cgroup_controllers = 7;
+  bool overlay_fs = 8;
+  bool root = 9;
+  bool ipv4_forwarding = 10;
+  string runtime_path = 11;
+  string images_path = 12;
+  string containers_path = 13;
+  string daemon_started_at = 14;
+  int64 daemon_uptime_seconds = 15;
+}
+
+message DoctorRequest {}
+
+enum DiagnosticStatus {
+  DIAGNOSTIC_STATUS_UNSPECIFIED = 0;
+  DIAGNOSTIC_STATUS_PASS = 1;
+  DIAGNOSTIC_STATUS_WARNING = 2;
+  DIAGNOSTIC_STATUS_FAIL = 3;
+}
+
+message DiagnosticCheck {
+  string code = 1;
+  string component = 2;
+  string name = 3;
+  DiagnosticStatus status = 4;
+  string detail = 5;
+  string hint = 6;
+}
+
+message DoctorResponse {
+  bool healthy = 1;
+  repeated DiagnosticCheck checks = 2;
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+  string version = 1;
+  string commit = 2;
+  string build_date = 3;
+  string go_version = 4;
+  string os = 5;
+  string architecture = 6;
+  string api_version = 7;
+  string state_version = 8;
+  string runtime_version = 9;
+}
+
 message CreateRequest {
     string name = 1;
     string image_identity = 2;
@@ -176,5 +240,4 @@ message ContainerListItem {
 
 message PsRequest {
 }
-
 

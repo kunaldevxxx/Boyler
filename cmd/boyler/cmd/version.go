@@ -1,22 +1,38 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
-	"os"
+	"runtime"
+
+	"boyler/cmd/boyler/cmd/ui"
+	buildversion "boyler/internal/version"
 
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
+var versionJSON bool
 
+func init() {
+	versionCmd.Flags().BoolVar(&versionJSON, "json", false, "Print version information as JSON")
+	rootCmd.AddCommand(versionCmd)
 }
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show version information",
-	Run: func(cmd *cobra.Command, args []string) {
-		loadEnv()
-		fmt.Fprintf(cmd.OutOrStdout(), "Boyler version %s\n", os.Getenv("VERSION"))
+	Use:     "version",
+	Short:   "Show version information",
+	GroupID: groupSystem,
+	Args:    cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		info := buildversion.Current(runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		if versionJSON {
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(info)
+		}
+		theme := ui.NewTheme(cmd.OutOrStdout(), colorMode.value)
+		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", theme.Gradient("Boyler"), theme.Brand(info.Version))
+		fmt.Fprintf(cmd.OutOrStdout(), "  commit: %s\n  built:  %s\n  target: %s/%s\n", info.Commit, info.BuildDate, info.OS, info.Arch)
+		return nil
 	},
 }

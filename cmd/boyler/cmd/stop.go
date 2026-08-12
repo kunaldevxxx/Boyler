@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
@@ -18,9 +17,10 @@ func init() {
 }
 
 var stopCmd = &cobra.Command{
-	Use:   "stop [CONTAINER_ID]",
-	Short: "Stop container",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "stop [CONTAINER_ID]",
+	Short:   "Stop a container",
+	GroupID: groupLifecycle,
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		id := args[0]
@@ -37,7 +37,7 @@ var stopCmd = &cobra.Command{
 		if err != nil {
 			return commandError(err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), id)
+		printActionResult(cmd.OutOrStdout(), "Stopped", id)
 		return nil
 	},
 }

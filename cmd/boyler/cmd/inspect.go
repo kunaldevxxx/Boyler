@@ -18,9 +18,10 @@ func init() {
 var inspectFormat string
 
 var inspectCmd = &cobra.Command{
-	Use:   "inspect [CONTAINER_ID]",
-	Short: "Display detailed information on a container",
-	Args:  cobra.ExactArgs(1),
+	Use:     "inspect [CONTAINER_ID]",
+	Short:   "Display detailed information on a container",
+	GroupID: groupObserve,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		id := args[0]
@@ -39,12 +40,12 @@ var inspectCmd = &cobra.Command{
 		}
 		if inspectFormat != "" {
 			if err := printInspectTemplate(cmd.OutOrStdout(), res, inspectFormat); err != nil {
-				return fmt.Errorf("Error: failed to format inspect response: %w", err)
+				return fmt.Errorf("format inspect response: %w", err)
 			}
 			return nil
 		}
 		if err := printInspect(cmd.OutOrStdout(), res); err != nil {
-			return fmt.Errorf("Error: failed to format inspect response: %w", err)
+			return fmt.Errorf("format inspect response: %w", err)
 		}
 		return nil
 	},

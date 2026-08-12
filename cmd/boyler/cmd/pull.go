@@ -19,9 +19,10 @@ func init() {
 }
 
 var pull = &cobra.Command{
-	Use:   "pull [IMAGE]",
-	Short: "Download an image",
-	Args:  cobra.ExactArgs(1),
+	Use:     "pull [IMAGE]",
+	Short:   "Download an image",
+	GroupID: groupImages,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		image := args[0]
@@ -31,7 +32,8 @@ var pull = &cobra.Command{
 		}
 		defer conn.Close()
 
-		ctx := context.Background()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		stream, err := client.PullImage(ctx, &pb.PullImageRequest{
 			ImageIdentity: image,
 		})
@@ -39,13 +41,19 @@ var pull = &cobra.Command{
 			return commandError(err)
 		}
 
-		events := make(chan tea.Msg, 100)
-		go grpcReader(stream, image, events)
-
 		repository, tag, canonical := pullReference(image)
-		fmt.Fprintf(cmd.OutOrStdout(), "%s: Pulling from %s\n", tag, repository)
+		events := make(chan tea.Msg, 100)
+		go grpcReader(stream, canonical, events)
+		theme := ui.NewTheme(cmd.OutOrStdout(), colorMode.value)
+		if theme.Terminal() {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n\n", theme.Heading("Pulling"), theme.Brand(repository+":"+tag))
+		}
 
-		p := tea.NewProgram(ui.New(events), tea.WithOutput(cmd.OutOrStdout()))
+		programOptions := []tea.ProgramOption{tea.WithOutput(cmd.OutOrStdout())}
+		if !theme.Terminal() {
+			programOptions = append(programOptions, tea.WithoutRenderer())
+		}
+		p := tea.NewProgram(ui.New(events, theme), programOptions...)
 		finalModel, err := p.Run()
 		if err != nil {
 			return err
@@ -54,7 +62,9 @@ var pull = &cobra.Command{
 		if ok && model.Err() != nil {
 			return commandError(model.Err())
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "docker.io/%s\n", canonical)
+		if !theme.Terminal() {
+			fmt.Fprintf(cmd.OutOrStdout(), "docker.io/%s\n", canonical)
+		}
 		return nil
 	},
 }

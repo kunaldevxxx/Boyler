@@ -25,7 +25,6 @@ func TestPrintContainersDockerStyle(t *testing.T) {
 
 	for _, expected := range []string{
 		"CONTAINER ID",
-		"PORTS",
 		"8e6ff240a1a5",
 		`"/bin/sh"`,
 		"12 minutes ago",

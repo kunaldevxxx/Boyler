@@ -14,13 +14,14 @@ func init() {
 }
 
 var initDaemonCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Start the Boyler daemon",
+	Use:     "init",
+	Short:   "Start the Boyler daemon",
+	GroupID: groupSystem,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		exePath, err := os.Executable()
 		if err != nil {
-			return fmt.Errorf("Error: failed to locate Boyler executable: %w", err)
+			return fmt.Errorf("locate Boyler executable: %w", err)
 		}
 		resPath, _ := filepath.EvalSymlinks(exePath)
 		binDir := filepath.Dir(resPath)
@@ -29,9 +30,9 @@ var initDaemonCmd = &cobra.Command{
 		cmdCommand := exec.Command(daemonPath)
 		cmdCommand.Dir = projectRoot
 		if err := cmdCommand.Start(); err != nil {
-			return fmt.Errorf("Error: failed to start Boyler daemon: %w", err)
+			return fmt.Errorf("start Boyler daemon: %w", err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), "Boyler daemon started")
+		printSuccess(cmd.OutOrStdout(), "Boyler daemon started")
 		return nil
 	},
 }

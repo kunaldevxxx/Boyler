@@ -9,6 +9,7 @@ import (
 	imageservice "boyler/internal/daemon/application/image_service"
 	networkservice "boyler/internal/daemon/application/network_service"
 	image "boyler/internal/daemon/infrastructure/outbound/image"
+	layer "boyler/internal/daemon/infrastructure/outbound/layer"
 	limits "boyler/internal/daemon/infrastructure/outbound/limits"
 	network "boyler/internal/daemon/infrastructure/outbound/network"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
@@ -17,7 +18,6 @@ import (
 	runtime "boyler/internal/runtime/myrunc"
 	"boyler/pkg/logger"
 )
-
 
 type DaemonConfig struct {
 	ImagesPath     string
@@ -29,9 +29,10 @@ type DaemonConfig struct {
 	Service        service.ServiceConfig
 }
 
-type SharedManager struct{
-	FS overlay.VolumeManager
-	Image image.ImageManager
+type SharedManager struct {
+	FS     overlay.VolumeManager
+	Image  image.ImageManager
+	Layers layer.Store
 }
 
 type DaemonFactory struct {
@@ -40,11 +41,13 @@ type DaemonFactory struct {
 }
 
 func NewDaemonFactory(config DaemonConfig) *DaemonFactory {
+	layers := layer.NewFilesystemStore(config.ImagesPath)
 	return &DaemonFactory{
 		config: config,
 		shared: SharedManager{
-			FS:    overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
-			Image: image.NewImageManager(config.ImagesPath),
+			FS:     overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
+			Image:  image.NewImageManagerWithLayerStore(config.ImagesPath, layers),
+			Layers: layers,
 		},
 	}
 }
@@ -76,7 +79,6 @@ func NewDaemonFactoryFromEnv() *DaemonFactory {
 	})
 }
 
-
 func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) {
 	if d == nil {
 		return nil, fmt.Errorf("daemon factory is nil")
@@ -104,17 +106,16 @@ func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) 
 }
 
 func (d *DaemonFactory) NewImageService() (imageservice.ImageService, error) {
-    return imageservice.NewImageService(
-        imageservice.ImageSerivceConfig{
-            UnpackDir: d.config.Service.UnpackDir,
-        },
-        d.shared.Image,
-        d.shared.FS,
-    ), nil
+	return imageservice.NewImageService(
+		imageservice.ImageSerivceConfig{
+			UnpackDir: d.config.Service.UnpackDir,
+		},
+		d.shared.Image,
+		d.shared.FS,
+	), nil
 }
 
-
-func envOr(node1 string, node2 string) string{ return filepath.Join(node1,node2) }
+func envOr(node1 string, node2 string) string { return filepath.Join(node1, node2) }
 
 func workingDirectory() string {
 	wd, err := os.Getwd()
@@ -124,9 +125,11 @@ func workingDirectory() string {
 	return wd
 }
 
-func projectRoot() (string,error) {
+func projectRoot() (string, error) {
 	wd, err := os.Getwd()
-	if err != nil {return "", err}
+	if err != nil {
+		return "", err
+	}
 	projectRoot := wd // /home/tema/Boyler
 	if filepath.Base(wd) == "bin" {
 		projectRoot = filepath.Dir(wd)

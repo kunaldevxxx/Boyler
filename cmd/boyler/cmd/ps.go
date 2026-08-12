@@ -7,11 +7,12 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	"boyler/cmd/boyler/cmd/ui"
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -31,8 +32,9 @@ var (
 )
 
 var psCmd = &cobra.Command{
-	Use:   "ps",
-	Short: "List containers",
+	Use:     "ps",
+	Short:   "List containers",
+	GroupID: groupObserve,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		client, conn, err := NewGrpcDaemonClient()
@@ -54,7 +56,7 @@ var psCmd = &cobra.Command{
 			filters: psFilters,
 			format:  psFormat,
 		}); err != nil {
-			return fmt.Errorf("Error: %w", err)
+			return err
 		}
 		return nil
 	},
@@ -146,25 +148,75 @@ func printContainersWithOptions(output io.Writer, resp *pb.PsResponse, now time.
 }
 
 func printContainerTable(output io.Writer, rows []containerRow) {
-	w := tabwriter.NewWriter(output, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(
-		w,
-		"CONTAINER ID\tIMAGE\tCOMMAND\tCREATED\tSTATUS\tPORTS\tNAMES",
-	)
-	for _, row := range rows {
-		fmt.Fprintf(
-			w,
-			"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			row.ID,
-			row.Image,
-			row.Command,
-			row.Created,
-			row.Status,
-			row.Ports,
-			row.Names,
+	theme := ui.NewTheme(output, colorMode.value)
+	type column struct {
+		header string
+		value  func(containerRow) string
+		style  func(string) string
+	}
+	columns := []column{
+		{header: "CONTAINER ID", value: func(row containerRow) string { return row.ID }, style: theme.Muted},
+		{header: "IMAGE", value: func(row containerRow) string { return row.Image }},
+	}
+	if !theme.Terminal() || theme.Width() >= 100 {
+		columns = append(columns,
+			column{header: "COMMAND", value: func(row containerRow) string { return row.Command }},
+			column{header: "CREATED", value: func(row containerRow) string { return row.Created }, style: theme.Muted},
 		)
 	}
-	_ = w.Flush()
+	columns = append(columns,
+		column{header: "STATUS", value: func(row containerRow) string { return terminalStatus(theme, row.Status) }},
+		column{header: "NAMES", value: func(row containerRow) string { return row.Names }, style: theme.Brand},
+	)
+
+	widths := make([]int, len(columns))
+	for index, col := range columns {
+		widths[index] = lipgloss.Width(col.header)
+		for _, row := range rows {
+			if width := lipgloss.Width(col.value(row)); width > widths[index] {
+				widths[index] = width
+			}
+		}
+	}
+
+	for index, col := range columns {
+		writeTableCell(output, theme.Label(col.header), widths[index], index == len(columns)-1)
+	}
+	fmt.Fprintln(output)
+	for _, row := range rows {
+		for index, col := range columns {
+			value := col.value(row)
+			if col.style != nil {
+				value = col.style(value)
+			}
+			writeTableCell(output, value, widths[index], index == len(columns)-1)
+		}
+		fmt.Fprintln(output)
+	}
+}
+
+func writeTableCell(output io.Writer, value string, width int, last bool) {
+	fmt.Fprint(output, value)
+	if !last {
+		padding := width - lipgloss.Width(value) + 3
+		fmt.Fprint(output, strings.Repeat(" ", padding))
+	}
+}
+
+func terminalStatus(theme ui.Theme, status string) string {
+	if !theme.Terminal() && !theme.Enabled() {
+		return status
+	}
+	switch {
+	case strings.Contains(status, "Paused"):
+		return theme.Warning(theme.Symbol("●", "*") + " " + status)
+	case strings.HasPrefix(status, "Up"):
+		return theme.Success(theme.Symbol("●", "*") + " " + status)
+	case strings.HasPrefix(status, "Exited"):
+		return theme.Error(theme.Symbol("○", "-") + " " + status)
+	default:
+		return theme.Muted(status)
+	}
 }
 
 func filterContainers(containers []*pb.ContainerListItem, filters []string) ([]*pb.ContainerListItem, error) {

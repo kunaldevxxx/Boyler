@@ -524,3 +524,186 @@ var ImageService_ServiceDesc = grpc.ServiceDesc{
 	},
 	Metadata: "daemon.proto",
 }
+
+const (
+	DaemonInspectionService_SystemInfo_FullMethodName = "/daemon.DaemonInspectionService/SystemInfo"
+	DaemonInspectionService_Doctor_FullMethodName     = "/daemon.DaemonInspectionService/Doctor"
+	DaemonInspectionService_Version_FullMethodName    = "/daemon.DaemonInspectionService/Version"
+)
+
+// DaemonInspectionServiceClient is the client API for DaemonInspectionService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// DaemonInspectionService exposes read-only daemon and host diagnostics.
+type DaemonInspectionServiceClient interface {
+	SystemInfo(ctx context.Context, in *SystemInfoRequest, opts ...grpc.CallOption) (*SystemInfoResponse, error)
+	Doctor(ctx context.Context, in *DoctorRequest, opts ...grpc.CallOption) (*DoctorResponse, error)
+	Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
+}
+
+type daemonInspectionServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewDaemonInspectionServiceClient(cc grpc.ClientConnInterface) DaemonInspectionServiceClient {
+	return &daemonInspectionServiceClient{cc}
+}
+
+func (c *daemonInspectionServiceClient) SystemInfo(ctx context.Context, in *SystemInfoRequest, opts ...grpc.CallOption) (*SystemInfoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SystemInfoResponse)
+	err := c.cc.Invoke(ctx, DaemonInspectionService_SystemInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonInspectionServiceClient) Doctor(ctx context.Context, in *DoctorRequest, opts ...grpc.CallOption) (*DoctorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DoctorResponse)
+	err := c.cc.Invoke(ctx, DaemonInspectionService_Doctor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonInspectionServiceClient) Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VersionResponse)
+	err := c.cc.Invoke(ctx, DaemonInspectionService_Version_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DaemonInspectionServiceServer is the server API for DaemonInspectionService service.
+// All implementations must embed UnimplementedDaemonInspectionServiceServer
+// for forward compatibility.
+//
+// DaemonInspectionService exposes read-only daemon and host diagnostics.
+type DaemonInspectionServiceServer interface {
+	SystemInfo(context.Context, *SystemInfoRequest) (*SystemInfoResponse, error)
+	Doctor(context.Context, *DoctorRequest) (*DoctorResponse, error)
+	Version(context.Context, *VersionRequest) (*VersionResponse, error)
+	mustEmbedUnimplementedDaemonInspectionServiceServer()
+}
+
+// UnimplementedDaemonInspectionServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedDaemonInspectionServiceServer struct{}
+
+func (UnimplementedDaemonInspectionServiceServer) SystemInfo(context.Context, *SystemInfoRequest) (*SystemInfoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SystemInfo not implemented")
+}
+func (UnimplementedDaemonInspectionServiceServer) Doctor(context.Context, *DoctorRequest) (*DoctorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Doctor not implemented")
+}
+func (UnimplementedDaemonInspectionServiceServer) Version(context.Context, *VersionRequest) (*VersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Version not implemented")
+}
+func (UnimplementedDaemonInspectionServiceServer) mustEmbedUnimplementedDaemonInspectionServiceServer() {
+}
+func (UnimplementedDaemonInspectionServiceServer) testEmbeddedByValue() {}
+
+// UnsafeDaemonInspectionServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to DaemonInspectionServiceServer will
+// result in compilation errors.
+type UnsafeDaemonInspectionServiceServer interface {
+	mustEmbedUnimplementedDaemonInspectionServiceServer()
+}
+
+func RegisterDaemonInspectionServiceServer(s grpc.ServiceRegistrar, srv DaemonInspectionServiceServer) {
+	// If the following call panics, it indicates UnimplementedDaemonInspectionServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&DaemonInspectionService_ServiceDesc, srv)
+}
+
+func _DaemonInspectionService_SystemInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SystemInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonInspectionServiceServer).SystemInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonInspectionService_SystemInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonInspectionServiceServer).SystemInfo(ctx, req.(*SystemInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonInspectionService_Doctor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DoctorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonInspectionServiceServer).Doctor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonInspectionService_Doctor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonInspectionServiceServer).Doctor(ctx, req.(*DoctorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonInspectionService_Version_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonInspectionServiceServer).Version(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonInspectionService_Version_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonInspectionServiceServer).Version(ctx, req.(*VersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// DaemonInspectionService_ServiceDesc is the grpc.ServiceDesc for DaemonInspectionService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var DaemonInspectionService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "daemon.DaemonInspectionService",
+	HandlerType: (*DaemonInspectionServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SystemInfo",
+			Handler:    _DaemonInspectionService_SystemInfo_Handler,
+		},
+		{
+			MethodName: "Doctor",
+			Handler:    _DaemonInspectionService_Doctor_Handler,
+		},
+		{
+			MethodName: "Version",
+			Handler:    _DaemonInspectionService_Version_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "daemon.proto",
+}

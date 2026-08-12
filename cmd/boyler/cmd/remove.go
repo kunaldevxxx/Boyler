@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
@@ -14,9 +13,10 @@ func init() {
 }
 
 var removeCmd = &cobra.Command{
-	Use:   "remove [CONTAINER_ID]",
-	Short: "Remove a container",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "remove [CONTAINER_ID]",
+	Short:   "Remove a container",
+	GroupID: groupLifecycle,
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		id := args[0]
@@ -34,7 +34,7 @@ var removeCmd = &cobra.Command{
 		if err != nil {
 			return commandError(err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), id)
+		printActionResult(cmd.OutOrStdout(), "Removed", id)
 		return nil
 	},
 }

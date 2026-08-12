@@ -18,8 +18,6 @@ func NewGrpcDaemonClient() (pb.ContainerServiceClient, *grpc.ClientConn, error) 
 	return client, connection, nil
 }
 
-
-
 func NewGrpcDaemonPullingClient() (pb.ImageServiceClient, *grpc.ClientConn, error) {
 	target := "unix://" + os.Getenv("UNIX_SOCKET")
 	connection, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))

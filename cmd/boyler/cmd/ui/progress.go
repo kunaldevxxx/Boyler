@@ -3,9 +3,9 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type ProgressMsg struct {
@@ -21,6 +21,8 @@ type DoneMsg struct {
 	Err   error
 }
 
+type tickMsg time.Time
+
 type layer struct {
 	status   string
 	progress float64
@@ -29,18 +31,25 @@ type layer struct {
 }
 
 type Model struct {
-	events <-chan tea.Msg
-	order  []string
-	layers map[string]*layer
-	done   bool
-	err    error
-	image  string
+	events  <-chan tea.Msg
+	order   []string
+	layers  map[string]*layer
+	done    bool
+	err     error
+	image   string
+	theme   Theme
+	width   int
+	frame   int
+	started time.Time
 }
 
-func New(events <-chan tea.Msg) Model {
+func New(events <-chan tea.Msg, theme Theme) Model {
 	return Model{
-		events: events,
-		layers: make(map[string]*layer),
+		events:  events,
+		layers:  make(map[string]*layer),
+		theme:   theme,
+		width:   theme.Width(),
+		started: time.Now(),
 	}
 }
 
@@ -54,8 +63,12 @@ func waitForMsg(events <-chan tea.Msg) tea.Cmd {
 	}
 }
 
+func tick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(value time.Time) tea.Msg { return tickMsg(value) })
+}
+
 func (m Model) Init() tea.Cmd {
-	return waitForMsg(m.events)
+	return tea.Batch(waitForMsg(m.events), tick())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -79,54 +92,78 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.image = msg.Image
 		return m, tea.Quit
 
+	case tickMsg:
+		m.frame++
+		return m, tick()
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			m.err = fmt.Errorf("pull canceled")
 			return m, tea.Quit
 		}
 	}
 	return m, nil
 }
 
-const barWidth = 30
-
-var (
-	barStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	doneStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-)
-
-func renderBar(progress float64) string {
-	filled := int(progress * barWidth)
-	if filled < 0 {
-		filled = 0
+func renderBar(theme Theme, progress float64, width int) string {
+	if width < 8 {
+		width = 8
 	}
-	if filled > barWidth {
-		filled = barWidth
+	if progress < 0 {
+		progress = 0
 	}
-	if filled == barWidth {
-		return barStyle.Render(strings.Repeat("=", barWidth))
+	if progress > 1 {
+		progress = 1
 	}
-	completed := strings.Repeat("=", filled)
-	marker := ""
-	if filled > 0 {
-		marker = ">"
-	}
-	remaining := strings.Repeat(" ", barWidth-filled-len(marker))
-	return barStyle.Render(completed+marker) + remaining
+	filled := int(progress * float64(width))
+	full, empty := theme.Symbol("█", "="), theme.Symbol("░", "-")
+	return theme.Success(strings.Repeat(full, filled)) + theme.Muted(strings.Repeat(empty, width-filled))
 }
 
 func (m Model) View() string {
 	var b strings.Builder
+	barWidth := m.width - 57
+	if barWidth < 12 {
+		barWidth = 12
+	}
+	if barWidth > 36 {
+		barWidth = 36
+	}
+
 	for _, id := range m.order {
 		l := m.layers[id]
-		if l.status == "Pull complete" {
-			b.WriteString(doneStyle.Render(fmt.Sprintf("%s: Pull complete", id)) + "\n")
-			continue
+		shortID := id
+		if len(shortID) > 12 {
+			shortID = shortID[:12]
 		}
-		b.WriteString(fmt.Sprintf("%s: %-11s [%s] %s/%s\n",
-			id, l.status, renderBar(l.progress), humanSize(l.current), humanSize(l.total)))
+		complete := l.progress >= 1 || strings.Contains(strings.ToLower(l.status), "complete")
+		cached := strings.EqualFold(l.status, "Already exists")
+		percent := int(l.progress*100 + .5)
+		status := fmt.Sprintf("%3d%%", percent)
+		if cached {
+			status = m.theme.Success("already exists")
+		} else if complete {
+			status = m.theme.Success("complete")
+		} else {
+			frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+			if m.theme.Symbol("unicode", "ascii") == "ascii" {
+				frames = []string{"|", "/", "-", "\\"}
+			}
+			status = m.theme.Brand(frames[m.frame%len(frames)]) + " " + status
+		}
+		fmt.Fprintf(&b, "  %s  %s  %s / %s  %s\n",
+			m.theme.Muted(shortID), renderBar(m.theme, l.progress, barWidth),
+			humanSize(l.current), humanSize(l.total), status)
 	}
 	if m.done {
-		b.WriteString("\n" + doneStyle.Render(fmt.Sprintf("Status: Downloaded newer image for %s", displayImage(m.image))) + "\n")
+		duration := time.Since(m.started).Round(100 * time.Millisecond)
+		fmt.Fprintf(&b, "\n%s %s\n",
+			m.theme.Success(m.theme.Symbol("✓", "+")),
+			m.theme.Success(fmt.Sprintf("Image downloaded in %s", duration)))
+		fmt.Fprintf(&b, "  %s\n", m.theme.Muted("docker.io/"+displayImage(m.image)))
 	}
 	return b.String()
 }
@@ -140,9 +177,7 @@ func displayImage(value string) string {
 	return value
 }
 
-func (m Model) Err() error {
-	return m.err
-}
+func (m Model) Err() error { return m.err }
 
 func humanSize(value int64) string {
 	if value < 0 {

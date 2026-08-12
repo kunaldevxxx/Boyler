@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 
+	"boyler/cmd/boyler/cmd/ui"
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
 
 	"google.golang.org/grpc/codes"
@@ -17,9 +18,44 @@ import (
 
 func commandError(err error) error {
 	if status.Code(err) == codes.Unavailable {
-		return fmt.Errorf("Cannot connect to the Boyler daemon at unix://%s. Is the boyler daemon running?", os.Getenv("UNIX_SOCKET"))
+		socket := os.Getenv("UNIX_SOCKET")
+		if socket == "" {
+			return fmt.Errorf("cannot connect to Boyler daemon\n\n  Configuration: UNIX_SOCKET is not set\n  Hint:          provide it in the environment or Boyler .env file")
+		}
+		return fmt.Errorf("cannot connect to Boyler daemon\n\n  Socket: unix://%s\n  Hint:   start it with 'boyler init'", socket)
 	}
-	return fmt.Errorf("Error response from daemon: %s", status.Convert(err).Message())
+	if _, ok := status.FromError(err); !ok {
+		return err
+	}
+	return fmt.Errorf("daemon: %s", status.Convert(err).Message())
+}
+
+func printActionResult(output io.Writer, action, id string) {
+	theme := ui.NewTheme(output, colorMode.value)
+	if !theme.Terminal() {
+		fmt.Fprintln(output, id)
+		return
+	}
+	fmt.Fprintf(output, "%s %s  %s\n", theme.Success(theme.Symbol("✓", "+")), theme.Success(action), theme.Muted(id))
+}
+
+func printSuccess(output io.Writer, message string) {
+	theme := ui.NewTheme(output, colorMode.value)
+	if !theme.Terminal() {
+		fmt.Fprintln(output, message)
+		return
+	}
+	fmt.Fprintf(output, "%s %s\n", theme.Success(theme.Symbol("✓", "+")), theme.Success(message))
+}
+
+func printWarning(output io.Writer, message string) {
+	theme := ui.NewTheme(output, colorMode.value)
+	fmt.Fprintf(output, "%s %s\n", theme.Warning(theme.Symbol("!", "Warning:")), message)
+}
+
+func printFailure(output io.Writer, err error) {
+	theme := ui.NewTheme(output, colorMode.value)
+	fmt.Fprintf(output, "%s %s\n", theme.Error(theme.Symbol("✗", "Error:")), err)
 }
 
 func shortContainerID(id string) string {

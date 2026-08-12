@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -38,11 +37,12 @@ func init() {
 }
 
 var createCmd = &cobra.Command{
-	Use:   "create [IMAGE] [COMMAND...]",
-	Short: "Create a new container",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "create [IMAGE] [COMMAND...]",
+	Short:   "Create a new container",
+	GroupID: groupLifecycle,
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		imageIdentity := strings.ReplaceAll(args[0], ":", "_")
+		imageIdentity := args[0]
 		loadEnv()
 		var containerArgs []string
 		if len(args) > 1 {
@@ -91,7 +91,7 @@ var createCmd = &cobra.Command{
 		if err != nil {
 			return commandError(err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), res.GetContainerId())
+		printActionResult(cmd.OutOrStdout(), "Created", res.GetContainerId())
 		return nil
 	},
 }
