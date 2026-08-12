@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -18,36 +19,57 @@ func init() {
 }
 
 var pull = &cobra.Command{
-	Use:   "pull [IMAGE]",
-	Short: "Pull image from docker registry",
-	Args:  cobra.ExactArgs(1),
+	Use:     "pull [IMAGE]",
+	Short:   "Download an image",
+	GroupID: groupImages,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		image := args[0]
 		client, conn, err := NewGrpcDaemonPullingClient()
 		if err != nil {
-			return fmt.Errorf("connecting to daemon: %w", err)
+			return commandError(err)
 		}
 		defer conn.Close()
 
-		ctx := context.Background()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		stream, err := client.PullImage(ctx, &pb.PullImageRequest{
 			ImageIdentity: image,
 		})
 		if err != nil {
-			return fmt.Errorf("creating grpc stream: %w", err)
+			return commandError(err)
 		}
 
+		repository, tag, canonical := pullReference(image)
 		events := make(chan tea.Msg, 100)
-		go grpcReader(stream, image, events)
+		go grpcReader(stream, canonical, events)
+		theme := ui.NewTheme(cmd.OutOrStdout(), colorMode.value)
+		if theme.Terminal() {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n\n", theme.Heading("Pulling"), theme.Brand(repository+":"+tag))
+		}
 
-		p := tea.NewProgram(ui.New(events))
-		_, err = p.Run()
-		return err
+		programOptions := []tea.ProgramOption{tea.WithOutput(cmd.OutOrStdout())}
+		if !theme.Terminal() {
+			programOptions = append(programOptions, tea.WithoutRenderer())
+		}
+		p := tea.NewProgram(ui.New(events, theme), programOptions...)
+		finalModel, err := p.Run()
+		if err != nil {
+			return err
+		}
+		model, ok := finalModel.(ui.Model)
+		if ok && model.Err() != nil {
+			return commandError(model.Err())
+		}
+		if !theme.Terminal() {
+			fmt.Fprintf(cmd.OutOrStdout(), "docker.io/%s\n", canonical)
+		}
+		return nil
 	},
 }
 
-func grpcReader(stream grpc.ServerStreamingClient[pb.PullImageEvent],image string, events chan<- tea.Msg) {
+func grpcReader(stream grpc.ServerStreamingClient[pb.PullImageEvent], image string, events chan<- tea.Msg) {
 	defer close(events)
 	for {
 		resp, err := stream.Recv()
@@ -56,7 +78,7 @@ func grpcReader(stream grpc.ServerStreamingClient[pb.PullImageEvent],image strin
 			return
 		}
 		if err != nil {
-			events <- ui.DoneMsg{Image: image}
+			events <- ui.DoneMsg{Image: image, Err: err}
 			return
 		}
 
@@ -64,8 +86,27 @@ func grpcReader(stream grpc.ServerStreamingClient[pb.PullImageEvent],image strin
 			ID:       resp.Layid,
 			Status:   resp.Status,
 			Progress: ratio(resp.Progress, resp.Total),
+			Current:  resp.Progress,
+			Total:    resp.Total,
 		}
 	}
+}
+
+func pullReference(value string) (repository, tag, canonical string) {
+	value = strings.TrimPrefix(value, "docker.io/")
+	tag = "latest"
+	repository = value
+	lastSlash := strings.LastIndex(repository, "/")
+	lastColon := strings.LastIndex(repository, ":")
+	if lastColon > lastSlash {
+		tag = repository[lastColon+1:]
+		repository = repository[:lastColon]
+	}
+	if !strings.Contains(repository, "/") {
+		repository = "library/" + repository
+	}
+	canonical = repository + ":" + tag
+	return repository, tag, canonical
 }
 
 func ratio(current, total int64) float64 {

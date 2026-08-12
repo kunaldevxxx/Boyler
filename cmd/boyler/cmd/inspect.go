@@ -5,41 +5,48 @@ import (
 	"fmt"
 	"time"
 
-	utils "boyler/cmd/boyler/cmd/utils"
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
 
 	"github.com/spf13/cobra"
 )
 
-
-
 func init() {
-    rootCmd.AddCommand(inspectCmd)
+	rootCmd.AddCommand(inspectCmd)
+	inspectCmd.Flags().StringVarP(&inspectFormat, "format", "f", "", "Format output using a Go template or 'json'")
 }
 
-var inspectCmd = &cobra.Command{
-    Use:   "inspect [CONTAINER_ID]",
-    Short: "Inspect container",
-    Args:  cobra.MinimumNArgs(1),
-    Run: func(cmd *cobra.Command, args []string) {
-        loadEnv()
-        id := args[0]
-        client, conn, err := NewGrpcDaemonClient()
-        if err != nil {
-            fmt.Printf("Error connecting to daemon: %v\n", err)
-            return
-        }
-        defer conn.Close()
-        req := &pb.InspectRequest{ContainerId: id}
-        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-        defer cancel()
+var inspectFormat string
 
-        res, err := client.InspectContainer(ctx, req)
-        if err != nil {
-            fmt.Printf("Failed to stop container: %v\n", err)
-            return
-        }
-        fmt.Printf("Container metadata\n")
-        utils.PrintProtoJSON(res)
-    },
+var inspectCmd = &cobra.Command{
+	Use:     "inspect [CONTAINER_ID]",
+	Short:   "Display detailed information on a container",
+	GroupID: groupObserve,
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loadEnv()
+		id := args[0]
+		client, conn, err := NewGrpcDaemonClient()
+		if err != nil {
+			return commandError(err)
+		}
+		defer conn.Close()
+		req := &pb.InspectRequest{ContainerId: id}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		res, err := client.InspectContainer(ctx, req)
+		if err != nil {
+			return commandError(err)
+		}
+		if inspectFormat != "" {
+			if err := printInspectTemplate(cmd.OutOrStdout(), res, inspectFormat); err != nil {
+				return fmt.Errorf("format inspect response: %w", err)
+			}
+			return nil
+		}
+		if err := printInspect(cmd.OutOrStdout(), res); err != nil {
+			return fmt.Errorf("format inspect response: %w", err)
+		}
+		return nil
+	},
 }

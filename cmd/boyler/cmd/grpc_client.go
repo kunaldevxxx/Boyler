@@ -18,8 +18,6 @@ func NewGrpcDaemonClient() (pb.ContainerServiceClient, *grpc.ClientConn, error) 
 	return client, connection, nil
 }
 
-
-
 func NewGrpcDaemonPullingClient() (pb.ImageServiceClient, *grpc.ClientConn, error) {
 	target := "unix://" + os.Getenv("UNIX_SOCKET")
 	connection, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -28,4 +26,17 @@ func NewGrpcDaemonPullingClient() (pb.ImageServiceClient, *grpc.ClientConn, erro
 	}
 	client := pb.NewImageServiceClient(connection)
 	return client, connection, nil
+}
+
+func NewGrpcDaemonInspectionClient() (pb.DaemonInspectionServiceClient, *grpc.ClientConn, error) {
+	target := "unix://" + os.Getenv("UNIX_SOCKET")
+	connection, err := grpc.NewClient(
+		target,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(4<<20), grpc.MaxCallSendMsgSize(4<<20)),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pb.NewDaemonInspectionServiceClient(connection), connection, nil
 }

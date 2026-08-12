@@ -1,10 +1,10 @@
 package cmd
-import(
-	"path/filepath"
-	"github.com/joho/godotenv"
+
+import (
 	"fmt"
+	"github.com/joho/godotenv"
 	"os"
-	
+	"path/filepath"
 )
 
 func loadEnv() {
@@ -13,6 +13,10 @@ func loadEnv() {
 	binDir := filepath.Dir(resPath)
 	envPath := filepath.Join(filepath.Dir(binDir), ".env")
 	if err := godotenv.Load(envPath); err != nil {
-		fmt.Printf("warning: .env not loaded from %s: %v\n", envPath, err)
+		// A .env file is optional: production installs commonly provide their
+		// configuration through the process environment.
+		if !os.IsNotExist(err) {
+			printWarning(os.Stderr, fmt.Sprintf("could not load %s: %v", envPath, err))
+		}
 	}
 }

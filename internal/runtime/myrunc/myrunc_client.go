@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"strconv"
+	"syscall"
 
 	"github.com/creack/pty"
 )
@@ -38,7 +38,7 @@ func (r *myRunc) Create(ctx context.Context, id string, bundlePath string) error
 }
 
 func (r *myRunc) Run(ctx context.Context, id string) error {
-	cmd := exec.CommandContext(ctx, r.binaryPath, "run", id, "--bundle", "absBundlePath")
+	cmd := exec.CommandContext(ctx, r.binaryPath, "run", id)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("Failed to run container: %w", err)
@@ -92,7 +92,6 @@ func (c *myRunc) State(ctx context.Context, id string) (*runtime.State, error) {
 	return &containerState, nil
 }
 
-
 type ptyProcess struct {
 	io.ReadWriteCloser
 	cmd *exec.Cmd
@@ -100,10 +99,9 @@ type ptyProcess struct {
 
 func (p *ptyProcess) Close() error {
 	err := p.ReadWriteCloser.Close()
-	_ = p.cmd.Wait() 
+	_ = p.cmd.Wait()
 	return err
 }
-
 
 func (r *myRunc) ExecPTY(ctx context.Context, pid int64) (io.ReadWriteCloser, error) {
 	cmd := exec.CommandContext(
@@ -127,5 +125,5 @@ func (r *myRunc) ExecPTY(ctx context.Context, pid int64) (io.ReadWriteCloser, er
 	return &ptyProcess{
 		ReadWriteCloser: file,
 		cmd:             cmd,
-	},  nil
+	}, nil
 }

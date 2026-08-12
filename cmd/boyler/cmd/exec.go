@@ -9,10 +9,11 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"regexp"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -21,40 +22,41 @@ var (
 )
 
 var execCmd = &cobra.Command{
-	Use:   "exec <container>",
-	Short: "Execute shell inside container and stream from daemon. To escape send SIGTERM signal (Ctrl+C)",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:     "exec <container>",
+	Short:   "Execute a command in a running container",
+	GroupID: groupLifecycle,
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		loadEnv()
 		containerID := args[0]
 		client, conn, err := NewGrpcDaemonClient()
 		if err != nil {
-			fmt.Printf("Error connecting to daemon: %v\n", err)
-			return
-		} 
+			return commandError(err)
+		}
 		defer conn.Close()
 
 		streamCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		stream, err := client.AttachContainer(streamCtx)
-		if err != nil{
-			fmt.Printf("Error open stream with deamon: %v", err)
+		if err != nil {
 			cancel()
-			return
+			return commandError(err)
 		}
 
 		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan,syscall.SIGTERM, os.Interrupt)
+		signal.Notify(sigChan, syscall.SIGTERM, os.Interrupt)
+		defer signal.Stop(sigChan)
 		go func() {
 			<-sigChan
-			fmt.Printf("Streaming end\n")
 			cancel()
 		}()
 
 		var wg sync.WaitGroup
 		wg.Add(2)
-		go commandInput(stream, &wg, containerID, streamCtx)
-		go receiveOutput(stream, &wg)
+		go commandInput(stream, &wg, containerID, streamCtx, cmd.ErrOrStderr())
+		go receiveOutput(stream, &wg, cmd.OutOrStdout(), cmd.ErrOrStderr())
 		wg.Wait()
+		return nil
 	},
 }
 
@@ -64,9 +66,7 @@ func init() {
 	execCmd.Flags().BoolVarP(&tty, "tty", "t", false, "Allocate a pseudo-TTY")
 }
 
-
-
-func receiveOutput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse], wg *sync.WaitGroup) {
+func receiveOutput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse], wg *sync.WaitGroup, output, errorOutput io.Writer) {
 	defer wg.Done()
 	for {
 		resp, err := stream.Recv()
@@ -74,16 +74,17 @@ func receiveOutput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachRe
 			return
 		}
 		if err != nil {
-			fmt.Printf("Streaming terminated")
+			if status.Code(err) == codes.Canceled {
+				return
+			}
+			printFailure(errorOutput, fmt.Errorf("receive container output: %w", err))
 			return
 		}
-		fmt.Printf("%s\n", cleanANSI(resp.GetStdout()))
+		_, _ = output.Write(resp.GetStdout())
 	}
 }
 
-
-
-func commandInput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse],wg *sync.WaitGroup,id string,ctx context.Context){
+func commandInput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachResponse], wg *sync.WaitGroup, id string, ctx context.Context, errorOutput io.Writer) {
 	defer wg.Done()
 	req := &pb.AttachRequest{
 		Payload: &pb.AttachRequest_Init{
@@ -91,7 +92,7 @@ func commandInput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachRes
 		},
 	}
 	if err := stream.Send(req); err != nil {
-		fmt.Printf("Init request sending error (attach_request): %v\n", err)
+		printFailure(errorOutput, fmt.Errorf("initialize attach stream: %w", err))
 		return
 	}
 	readCh := make(chan mes)
@@ -112,7 +113,7 @@ func commandInput(stream grpc.BidiStreamingClient[pb.AttachRequest, pb.AttachRes
 					Stdin: msg.buf,
 				},
 			}); err != nil {
-				fmt.Printf("Streaming sending error: %v\n", err)
+				printFailure(errorOutput, fmt.Errorf("send container input: %w", err))
 				return
 			}
 		}
@@ -134,10 +135,4 @@ func readBuf(ch chan mes) {
 		}
 		ch <- mes{ok: true, buf: buf[:n]}
 	}
-}
-
-var csiRegexp = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
-
-func cleanANSI(data []byte) []byte {
-    return csiRegexp.ReplaceAll(data, []byte{})
 }

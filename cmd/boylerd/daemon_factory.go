@@ -4,34 +4,40 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	service "boyler/internal/daemon/application/container_service"
 	imageservice "boyler/internal/daemon/application/image_service"
 	networkservice "boyler/internal/daemon/application/network_service"
+	systemservice "boyler/internal/daemon/application/system_service"
 	image "boyler/internal/daemon/infrastructure/outbound/image"
+	layer "boyler/internal/daemon/infrastructure/outbound/layer"
 	limits "boyler/internal/daemon/infrastructure/outbound/limits"
 	network "boyler/internal/daemon/infrastructure/outbound/network"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
 	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	systeminspector "boyler/internal/daemon/infrastructure/outbound/system"
 	runtime "boyler/internal/runtime/myrunc"
 	"boyler/pkg/logger"
 )
-
 
 type DaemonConfig struct {
 	ImagesPath     string
 	ContainersPath string
 	RuntimeBinPath string
+	ShimBinPath    string
+	StatePath      string
 
 	Network        networkservice.NetworkServiceConfig
 	NetworkManager network.Config
 	Service        service.ServiceConfig
 }
 
-type SharedManager struct{
-	FS overlay.VolumeManager
-	Image image.ImageManager
+type SharedManager struct {
+	FS     overlay.VolumeManager
+	Image  image.ImageManager
+	Layers layer.Store
 }
 
 type DaemonFactory struct {
@@ -40,11 +46,13 @@ type DaemonFactory struct {
 }
 
 func NewDaemonFactory(config DaemonConfig) *DaemonFactory {
+	layers := layer.NewFilesystemStore(config.ImagesPath)
 	return &DaemonFactory{
 		config: config,
 		shared: SharedManager{
-			FS:    overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
-			Image: image.NewImageManager(config.ImagesPath),
+			FS:     overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
+			Image:  image.NewImageManagerWithLayerStore(config.ImagesPath, layers),
+			Layers: layers,
 		},
 	}
 }
@@ -58,6 +66,8 @@ func NewDaemonFactoryFromEnv() *DaemonFactory {
 		ImagesPath:     imagesPath,
 		ContainersPath: containersPath,
 		RuntimeBinPath: envOr(root, os.Getenv("BIN_MYRUNC")),
+		ShimBinPath:    optionalPath(root, os.Getenv("BIN_SHIM")),
+		StatePath:      optionalPath(root, os.Getenv("STATE_PATH")),
 		NetworkManager: network.Config{
 			Eth0:    os.Getenv("DEFAULT_ETH0"),
 			Forward: os.Getenv("IP_FORWARDING_PATH"),
@@ -76,6 +86,16 @@ func NewDaemonFactoryFromEnv() *DaemonFactory {
 	})
 }
 
+func (d *DaemonFactory) NewSystemService(startedAt time.Time) (systemservice.Service, error) {
+	if d == nil {
+		return nil, fmt.Errorf("daemon factory is nil")
+	}
+	inspector := systeminspector.NewInspector(systeminspector.Config{
+		RuntimePath: d.config.RuntimeBinPath, ImagesPath: d.config.ImagesPath,
+		ContainersPath: d.config.ContainersPath, ShimPath: d.config.ShimBinPath, StatePath: d.config.StatePath,
+	})
+	return systemservice.New(inspector, startedAt), nil
+}
 
 func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) {
 	if d == nil {
@@ -104,17 +124,26 @@ func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) 
 }
 
 func (d *DaemonFactory) NewImageService() (imageservice.ImageService, error) {
-    return imageservice.NewImageService(
-        imageservice.ImageSerivceConfig{
-            UnpackDir: d.config.Service.UnpackDir,
-        },
-        d.shared.Image,
-        d.shared.FS,
-    ), nil
+	return imageservice.NewImageService(
+		imageservice.ImageSerivceConfig{
+			UnpackDir: d.config.Service.UnpackDir,
+		},
+		d.shared.Image,
+		d.shared.FS,
+	), nil
 }
 
+func envOr(node1 string, node2 string) string { return filepath.Join(node1, node2) }
 
-func envOr(node1 string, node2 string) string{ return filepath.Join(node1,node2) }
+func optionalPath(root, value string) string {
+	if value == "" {
+		return ""
+	}
+	if filepath.IsAbs(value) {
+		return filepath.Clean(value)
+	}
+	return filepath.Join(root, value)
+}
 
 func workingDirectory() string {
 	wd, err := os.Getwd()
@@ -124,9 +153,11 @@ func workingDirectory() string {
 	return wd
 }
 
-func projectRoot() (string,error) {
+func projectRoot() (string, error) {
 	wd, err := os.Getwd()
-	if err != nil {return "", err}
+	if err != nil {
+		return "", err
+	}
 	projectRoot := wd // /home/tema/Boyler
 	if filepath.Base(wd) == "bin" {
 		projectRoot = filepath.Dir(wd)

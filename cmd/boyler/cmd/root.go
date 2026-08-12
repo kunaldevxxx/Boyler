@@ -5,83 +5,142 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"sort"
+	"strings"
 
+	"boyler/cmd/boyler/cmd/ui"
+
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
-const boylerLogo = `
-  ____              _             
- | __ )  ___  _   _| | ___ _ __   
- |  _ \ / _ \| | | | |/ _ \ '__|  
- | |_) | (_) | |_| | |  __/ |     
- |____/ \___/ \__, |_|\___|_|     
-              |___/               
-        _ 
-      (o\<    [ Lightweight Container Runtime ]
-      //\\
-      V_/_
-`
+const (
+	groupLifecycle = "lifecycle"
+	groupImages    = "images"
+	groupObserve   = "observe"
+	groupSystem    = "system"
+)
 
-const boylerManual = `
---- BOYLER CLI MANUAL ---
+type colorModeValue struct{ value string }
 
-Overview:
-  Boyler is a lightweight container engine built from scratch in Go 
-  using Linux namespaces.
+func (value *colorModeValue) String() string { return value.value }
+func (value *colorModeValue) Type() string   { return "mode" }
+func (value *colorModeValue) Set(next string) error {
+	if !ui.ValidColorMode(next) {
+		return fmt.Errorf("must be one of auto, always, never")
+	}
+	value.value = next
+	return nil
+}
 
-Available Commands:
-  create       Create a new container (e.g., boyler create alpine --name HELLO_WORLD)
-  start        Start an existing container
-  stop         Stop a running container
-  remove (rm)  Remove a container
-  inspect      Show detailed information about a container
-  version      Print the current version of Boyler
+var colorMode = colorModeValue{value: ui.ColorAuto}
 
-Architecture & Runtime:
-  - Uses Linux namespaces (PID, Network, Mount, UTS, IPC) for isolation.
-  - Applies resource restrictions (Memory, CPU weight/quota/period) via cgroups.
-  - Communicates via gRPC between CLI and daemon (boylerd).
-  - Built with Clean Architecture (gRPC inbound -> Application use cases -> Core domain -> Outbound drivers / myrunc).
-
-Use "boyler [command] --help" for more information about a specific command.
-`
-
-
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "boyler",
-	Short: "Boyler is a lightweight custom container engine and runtime",
-	Long: `Boyler is a lightweight container engine built from scratch in Go 
-using Linux namespaces, cgroups, and OCI-compatible principles. 
-It allows you to create, start, and manage isolated containers with ease.`,
+	Short: "A lightweight container engine",
+	Long:  "A lightweight container engine",
+	Example: "  boyler pull alpine\n" +
+		"  boyler create --name web nginx\n" +
+		"  boyler ps --filter status=running",
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf(boylerLogo)
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
+		theme := ui.NewTheme(os.Stderr, colorMode.value)
+		fmt.Fprintf(os.Stderr, "%s %s\n", theme.Error(theme.Symbol("✗", "Error:")), err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	rootCmd.SetHelpTemplate(`{{.Long}}
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupLifecycle, Title: "Container lifecycle"},
+		&cobra.Group{ID: groupImages, Title: "Images"},
+		&cobra.Group{ID: groupObserve, Title: "Observe"},
+		&cobra.Group{ID: groupSystem, Title: "System"},
+	)
+	rootCmd.SetHelpCommandGroupID(groupSystem)
+	rootCmd.SetCompletionCommandGroupID(groupSystem)
+	rootCmd.PersistentFlags().Var(&colorMode, "color", "Color output: auto, always, or never")
+	rootCmd.SetHelpFunc(renderHelp)
+}
 
-Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasAvailableFlags}}
+func renderHelp(cmd *cobra.Command, _ []string) {
+	output := cmd.OutOrStdout()
+	theme := ui.NewTheme(output, colorMode.value)
 
-Flags:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableSubCommands}}
+	if cmd == cmd.Root() {
+		renderBanner(output, theme)
+	} else {
+		fmt.Fprintf(output, "%s\n  %s\n\n", theme.Brand(strings.ToUpper(cmd.Name())), cmd.Short)
+	}
 
-Available Commands:{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
-%s
-`)
+	fmt.Fprintln(output, theme.Heading("Usage"))
+	if cmd.HasAvailableSubCommands() {
+		fmt.Fprintf(output, "  %s [options] <command>\n", cmd.CommandPath())
+	} else {
+		fmt.Fprintf(output, "  %s\n", cmd.UseLine())
+	}
+
+	if cmd.HasAvailableSubCommands() {
+		commands := cmd.Commands()
+		sort.SliceStable(commands, func(i, j int) bool { return commands[i].Name() < commands[j].Name() })
+		for _, group := range cmd.Groups() {
+			if !groupHasCommands(commands, group.ID) {
+				continue
+			}
+			fmt.Fprintf(output, "\n%s\n", theme.Heading(group.Title))
+			for _, subcommand := range commands {
+				if subcommand.GroupID == group.ID && subcommand.IsAvailableCommand() {
+					name := theme.Brand(subcommand.Name())
+					padding := 12 - lipgloss.Width(name)
+					if padding < 1 {
+						padding = 1
+					}
+					fmt.Fprintf(output, "  %s%s%s\n", name, strings.Repeat(" ", padding), theme.Muted(subcommand.Short))
+				}
+			}
+		}
+	}
+	if cmd.Example != "" {
+		fmt.Fprintf(output, "\n%s\n%s\n", theme.Heading("Examples"), theme.Brand(cmd.Example))
+	}
+
+	if cmd.HasAvailableLocalFlags() {
+		fmt.Fprintf(output, "\n%s\n%s\n", theme.Heading("Options"), strings.TrimRight(cmd.LocalFlags().FlagUsages(), "\n"))
+	}
+	if cmd.HasAvailableInheritedFlags() {
+		fmt.Fprintf(output, "\n%s\n%s\n", theme.Heading("Global options"), strings.TrimRight(cmd.InheritedFlags().FlagUsages(), "\n"))
+	}
+	if cmd.HasAvailableSubCommands() {
+		fmt.Fprintf(output, "\n%s\n  %s\n", theme.Heading("Learn more"), theme.Muted(fmt.Sprintf("Run '%s <command> --help' for command details.", cmd.CommandPath())))
+	}
+}
+
+func renderBanner(output io.Writer, theme ui.Theme) {
+	if theme.Symbol("unicode", "ascii") == "ascii" {
+		fmt.Fprintf(output, "  [==]  %s\n        %s\n\n", theme.Gradient("BOYLER"), theme.Muted("lightweight container engine"))
+		return
+	}
+	fmt.Fprintf(output, "  ╭────╮   %s\n", theme.Gradient("BOYLER"))
+	fmt.Fprintf(output, "  │ ≋≋ │   %s\n", theme.Muted("lightweight container engine"))
+	fmt.Fprintln(output, "  ╰─┬──╯")
+	fmt.Fprintln(output, "    ╵")
+	fmt.Fprintln(output)
+}
+
+func groupHasCommands(commands []*cobra.Command, groupID string) bool {
+	for _, command := range commands {
+		if command.GroupID == groupID && command.IsAvailableCommand() {
+			return true
+		}
+	}
+	return false
 }

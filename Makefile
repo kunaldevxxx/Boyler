@@ -1,11 +1,15 @@
 OS = linux
-ARCH = amd_64
+ARCH = amd64
+VERSION ?= dev
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS = -s -w -X boyler/internal/version.Version=$(VERSION) -X boyler/internal/version.Commit=$(COMMIT) -X boyler/internal/version.BuildDate=$(BUILD_DATE)
 
 .PHONY: compile
 compile:
-	go build -o bin/boyler ./cmd/boyler
-	go build -o bin/myrunc ./cmd/myrunc
-	go build -o bin/daemon_boyler_$(OS) ./cmd/boylerd
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/boyler ./cmd/boyler
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/myrunc ./cmd/myrunc
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/daemon_boyler_$(OS) ./cmd/boylerd
 	@echo "Binary files was created"
 
 

@@ -6,7 +6,6 @@ import (
 	"context"
 )
 
-
 type ImageManager interface {
 	// Extract unpack .tar.gz archive
 	Extract(ctx context.Context, name string, unpackDir string) error
@@ -28,4 +27,7 @@ type ImageManager interface {
 
 	// Pull download images from dockerHub
 	Pull(ctx context.Context, name string, ch chan *core.PullingEvent) error
+
+	// Prune removes content-addressed layers not referenced by any image.
+	Prune(ctx context.Context) error
 }
