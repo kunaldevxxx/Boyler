@@ -7,7 +7,7 @@ import (
 	limits "boyler/internal/daemon/infrastructure/outbound/limits"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	run "boyler/internal/runtime"
 	"log/slog"
 	"sync"
@@ -19,7 +19,7 @@ type Deps struct {
 	Images         layer.ImageManager
 	Network        net.NetworkService
 	Reg            registry.ResourcesRegistry
-	Store          *storage.ContainerRepository
+	Store          storage.ContainerStorage
 	Logger         *slog.Logger
 	Conf           ServiceConfig
 	CgroupFactory  limits.Factory

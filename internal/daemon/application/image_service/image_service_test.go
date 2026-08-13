@@ -68,6 +68,9 @@ func TestPullStopsProducerAndReturnsStreamError(t *testing.T) {
 
 func TestPersistedContainerImageIdentityIsIncludedInPruneUsage(t *testing.T) {
 	containers := t.TempDir()
+	if err := os.Mkdir(filepath.Join(containers, ".state"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	containerDir := filepath.Join(containers, "container-id")
 	if err := os.MkdirAll(containerDir, 0755); err != nil {
 		t.Fatal(err)

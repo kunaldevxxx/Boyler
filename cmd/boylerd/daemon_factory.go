@@ -17,7 +17,8 @@ import (
 	network "boyler/internal/daemon/infrastructure/outbound/network"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
+	filesystemstorage "boyler/internal/daemon/infrastructure/outbound/storage/filesystem"
 	systeminspector "boyler/internal/daemon/infrastructure/outbound/system"
 	runtime "boyler/internal/runtime/myrunc"
 	"boyler/pkg/logger"
@@ -39,7 +40,7 @@ type SharedManager struct {
 	FS             overlay.VolumeManager
 	Image          image.ImageManager
 	Layers         layer.Store
-	Store          *storage.ContainerRepository
+	Store          storage.ContainerStorage
 	ImageLifecycle *sync.RWMutex
 }
 
@@ -48,21 +49,25 @@ type DaemonFactory struct {
 	shared SharedManager
 }
 
-func NewDaemonFactory(config DaemonConfig) *DaemonFactory {
+func NewDaemonFactory(config DaemonConfig) (*DaemonFactory, error) {
 	layers := layer.NewFilesystemStore(config.ImagesPath)
+	containerStore, err := filesystemstorage.NewContainerRepository(config.ContainersPath)
+	if err != nil {
+		return nil, fmt.Errorf("create container storage: %w", err)
+	}
 	return &DaemonFactory{
 		config: config,
 		shared: SharedManager{
 			FS:             overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
 			Image:          image.NewImageManagerWithLayerStore(config.ImagesPath, layers),
 			Layers:         layers,
-			Store:          storage.NewContainerRepository(),
+			Store:          containerStore,
 			ImageLifecycle: &sync.RWMutex{},
 		},
-	}
+	}, nil
 }
 
-func NewDaemonFactoryFromEnv() *DaemonFactory {
+func NewDaemonFactoryFromEnv() (*DaemonFactory, error) {
 	root := workingDirectory()
 	imagesPath := envOr(root, os.Getenv("IMAGE_PATH"))
 	containersPath := envOr(root, os.Getenv("CONTAINER_DIR"))

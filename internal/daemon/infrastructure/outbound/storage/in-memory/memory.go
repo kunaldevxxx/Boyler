@@ -1,4 +1,4 @@
-package storage
+package memory
 
 import (
 	"context"
@@ -6,7 +6,10 @@ import (
 	"sync"
 
 	core "boyler/internal/daemon/core"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 )
+
+var _ storage.ContainerStorage = (*ContainerRepository)(nil)
 
 type ContainerRepository struct {
 	mu   sync.RWMutex
@@ -31,7 +34,7 @@ func (r *ContainerRepository) Get(ctx context.Context, id string) (*core.Contain
 	defer r.mu.RUnlock()
 	c, ok := r.data[id]
 	if !ok {
-		return &core.Container{}, fmt.Errorf("container %s not found", id)
+		return nil, fmt.Errorf("%w: %s", core.ErrContainerNotFound, id)
 	}
 	return &c, nil
 }

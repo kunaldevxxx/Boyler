@@ -7,7 +7,7 @@ import (
 	limits "boyler/internal/daemon/infrastructure/outbound/limits"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	run "boyler/internal/runtime"
 	"context"
 	"encoding/json"
@@ -27,7 +27,7 @@ type Creator struct {
 	images         layer.ImageManager
 	network        net.NetworkService
 	reg            registry.ResourcesRegistry
-	store          *storage.ContainerRepository
+	store          storage.ContainerStorage
 	conf           ServiceConfig
 	cgroupFactory  limits.Factory
 	imageLifecycle *sync.RWMutex
@@ -80,7 +80,9 @@ func (c *Creator) ExecuteCreate(ctx context.Context, cmd CreateContainerCommand)
 		WithCoreName(cmd.ContainerName),
 		WithImageIdentity(resolved.Digest, resolved.RootfsDigest),
 	)
-	c.store.Save(ctx, *containerCore)
+	if err := c.store.Save(ctx, *containerCore); err != nil {
+		return nil, &core.InternalDaemonError{Op: "save container state", Err: err}
+	}
 
 	return &CreateContainerResponse{
 		ContainerContext: ContainerContext{ID: id},
@@ -156,7 +158,9 @@ func (c *Creator) ExecuteStart(ctx context.Context, cmd StartContainerCommand) (
 	container.StartedAt = startTime
 	container.PID = pid
 	container.Status = core.StatusRunning
-	c.store.Save(ctx, *container)
+	if err := c.store.Save(ctx, *container); err != nil {
+		return nil, &core.InternalDaemonError{Op: "save started container state", Err: err}
+	}
 
 	return &StartContainerResponse{
 		ContainerContext: ContainerContext{ID: id},

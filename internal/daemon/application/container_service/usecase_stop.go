@@ -6,7 +6,7 @@ import (
 	layer "boyler/internal/daemon/infrastructure/outbound/image"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	run "boyler/internal/runtime"
 	"boyler/pkg/logger"
 	"context"
@@ -20,7 +20,7 @@ type Stopper struct {
 	images  layer.ImageManager
 	network net.NetworkService
 	reg     registry.ResourcesRegistry
-	store   *storage.ContainerRepository
+	store   storage.ContainerStorage
 	conf    ServiceConfig
 }
 
@@ -55,7 +55,9 @@ func (s *Stopper) Execute(ctx context.Context, cmd StopContainerCommand) (*StopC
 			return nil, err
 		}
 		container.Status = core.StatusStopped
-		s.store.Update(ctx, *container)
+		if err := s.store.Update(ctx, *container); err != nil {
+			return nil, &core.InternalDaemonError{Op: "save stopped container state", Err: err}
+		}
 		if err := s.network.FreeIpAddress(ctx, cmd.ID); err != nil {
 			return nil, err
 		}

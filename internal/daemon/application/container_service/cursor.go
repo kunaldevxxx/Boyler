@@ -2,13 +2,13 @@ package application
 
 import (
 	"boyler/internal/daemon/core"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	"context"
 	"time"
 )
 
 type Cursor struct {
-	store *storage.ContainerRepository
+	store storage.ContainerStorage
 }
 
 func NewCursor(d Deps) *Cursor {

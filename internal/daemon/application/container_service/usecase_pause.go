@@ -3,14 +3,14 @@ package application
 import (
 	"boyler/internal/daemon/core"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	"boyler/pkg/logger"
 	"context"
 )
 
 type Pauser struct {
 	reg   registry.ResourcesRegistry
-	store *storage.ContainerRepository
+	store storage.ContainerStorage
 }
 
 func NewPauser(d Deps) *Pauser {
@@ -27,6 +27,9 @@ func (p *Pauser) Execute(ctx context.Context, cmd PauseContainerCommand) (*Pause
 		return nil, err
 	}
 	container, err := p.store.Get(ctx, cmd.ID)
+	if err != nil {
+		return nil, &core.InternalDaemonError{Op: "get container for pause", Err: err}
+	}
 	container.Status = core.StatusFreeze
 	if err = p.store.Update(ctx, *container); err != nil {
 		return nil, &core.InternalDaemonError{Op: "update", Err: err}

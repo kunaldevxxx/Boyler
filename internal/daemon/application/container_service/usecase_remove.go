@@ -5,7 +5,7 @@ import (
 	core "boyler/internal/daemon/core"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	run "boyler/internal/runtime"
 	"context"
 	"log/slog"
@@ -18,7 +18,7 @@ type Remover struct {
 	runtime run.Runtime
 	fs      overlay.VolumeManager
 	reg     registry.ResourcesRegistry
-	store   *storage.ContainerRepository
+	store   storage.ContainerStorage
 	network net.NetworkService
 }
 

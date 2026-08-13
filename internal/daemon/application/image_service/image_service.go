@@ -3,7 +3,7 @@ package imageservice
 import (
 	"boyler/internal/daemon/core"
 	"boyler/internal/daemon/infrastructure/outbound/image"
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -32,11 +32,11 @@ type ImageService interface {
 type imageService struct {
 	image     image.ImageManager
 	config    ImageServiceConfig
-	store     *storage.ContainerRepository
+	store     storage.ContainerStorage
 	lifecycle *sync.RWMutex
 }
 
-func NewImageService(config ImageServiceConfig, im image.ImageManager, store *storage.ContainerRepository, lifecycle ...*sync.RWMutex) ImageService {
+func NewImageService(config ImageServiceConfig, im image.ImageManager, store storage.ContainerStorage, lifecycle ...*sync.RWMutex) ImageService {
 	service := &imageService{config: config, image: im, store: store}
 	if len(lifecycle) > 0 {
 		service.lifecycle = lifecycle[0]
@@ -134,7 +134,7 @@ func (p *imageService) persistedOwners(digest string, knownContainers map[string
 	}
 	var owners []string
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(p.config.ContainersDir, entry.Name(), ".boyler-image.json"))
@@ -209,7 +209,7 @@ func (p *imageService) addPersistedUsage(used map[string]struct{}, knownContaine
 		return fmt.Errorf("read containers directory: %w", err)
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(p.config.ContainersDir, entry.Name(), ".boyler-image.json"))

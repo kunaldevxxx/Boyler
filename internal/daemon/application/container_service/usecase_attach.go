@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
+	storage "boyler/internal/daemon/infrastructure/outbound/storage"
 	run "boyler/internal/runtime"
 	"boyler/pkg/logger"
 )
@@ -20,7 +20,7 @@ type AttachStream interface {
 
 type Attacher struct {
 	runtime run.Runtime
-	store   *storage.ContainerRepository
+	store   storage.ContainerStorage
 }
 
 func NewAttacher(d Deps) *Attacher {

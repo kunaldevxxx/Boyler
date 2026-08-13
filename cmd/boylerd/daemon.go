@@ -11,7 +11,10 @@ import (
 )
 
 func main() {
-	factory := NewDaemonFactoryFromEnv()
+	factory, err := NewDaemonFactoryFromEnv()
+	if err != nil {
+		panic(fmt.Sprintf("CANNOT CREATE DAEMON FACTORY: %v", err))
+	}
 	containerService, err := factory.NewContainerService()
 	if err != nil {
 		panic(fmt.Sprintf("CANNOT CREATE DEAMON: %v", err))
