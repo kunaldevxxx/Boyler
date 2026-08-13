@@ -3,11 +3,11 @@ package application
 import (
 	"boyler/internal/daemon/core"
 	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
-	"time"
 	"context"
+	"time"
 )
 
-type Cursor struct{
+type Cursor struct {
 	store *storage.ContainerRepository
 }
 
@@ -19,10 +19,10 @@ func NewCursor(d Deps) *Cursor {
 
 func (c *Cursor) Execute(ctx context.Context, cmd InspectContainerCommand) (*InspectContainerResponse, error) {
 	return c.findContainer(ctx, cmd.ID)
-	
+
 }
 
-func (c *Cursor) findContainer(ctx context.Context, id string) (*InspectContainerResponse, error){
+func (c *Cursor) findContainer(ctx context.Context, id string) (*InspectContainerResponse, error) {
 	container, err := c.store.Get(ctx, id)
 	if err != nil {
 		return nil, &core.InternalDaemonError{Op: "find", Err: err}
@@ -30,13 +30,13 @@ func (c *Cursor) findContainer(ctx context.Context, id string) (*InspectContaine
 	return cursorPrivateMapper(container), nil
 }
 
-
 func (c *Cursor) Ps(ctx context.Context, cmd PsCommand) ([]*core.Container, error) {
-	containerList, err  := c.store.List(ctx)
-	if err != nil{ return nil, &core.InternalDaemonError{Op:"Ps", Err:err} }
+	containerList, err := c.store.List(ctx)
+	if err != nil {
+		return nil, &core.InternalDaemonError{Op: "Ps", Err: err}
+	}
 	return containerList, nil
 }
-
 
 func cursorPrivateMapper(container *core.Container) *InspectContainerResponse {
 	var maxMem int64
@@ -70,7 +70,7 @@ func cursorPrivateMapper(container *core.Container) *InspectContainerResponse {
 		Args:        container.Config.Args,
 		Resources: core.Restriction{
 			Memory: core.MemoryRestriction{
-				Max:   &maxMem,
+				Max: &maxMem,
 			},
 			CPU: core.CPURestriction{
 				Weight: &cpuWeight,

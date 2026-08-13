@@ -26,7 +26,6 @@ func (g *grpcStream) Receive() (*application.AttachInboundEvent, error) {
 	return MapAttachRequest(req), nil
 }
 
-
 type grpcProgressStream struct {
 	stream pb.ImageService_PullImageServer
 }
@@ -36,6 +35,6 @@ func (g *grpcProgressStream) Send(event *core.PullingEvent) error {
 	return g.stream.Send(grcpEvent)
 }
 
-type Stream interface{
+type Stream interface {
 	Send(*core.PullingEvent) error
 }

@@ -344,9 +344,11 @@ var ContainerService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ImageService_PullImage_FullMethodName   = "/daemon.ImageService/PullImage"
-	ImageService_RemoveImage_FullMethodName = "/daemon.ImageService/RemoveImage"
-	ImageService_ListImages_FullMethodName  = "/daemon.ImageService/ListImages"
+	ImageService_PullImage_FullMethodName    = "/daemon.ImageService/PullImage"
+	ImageService_RemoveImage_FullMethodName  = "/daemon.ImageService/RemoveImage"
+	ImageService_ListImages_FullMethodName   = "/daemon.ImageService/ListImages"
+	ImageService_InspectImage_FullMethodName = "/daemon.ImageService/InspectImage"
+	ImageService_PruneImages_FullMethodName  = "/daemon.ImageService/PruneImages"
 )
 
 // ImageServiceClient is the client API for ImageService service.
@@ -356,6 +358,8 @@ type ImageServiceClient interface {
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PullImageEvent], error)
 	RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error)
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
+	InspectImage(ctx context.Context, in *InspectImageRequest, opts ...grpc.CallOption) (*ImageSummary, error)
+	PruneImages(ctx context.Context, in *PruneImagesRequest, opts ...grpc.CallOption) (*PruneImagesResponse, error)
 }
 
 type imageServiceClient struct {
@@ -405,6 +409,26 @@ func (c *imageServiceClient) ListImages(ctx context.Context, in *ListImagesReque
 	return out, nil
 }
 
+func (c *imageServiceClient) InspectImage(ctx context.Context, in *InspectImageRequest, opts ...grpc.CallOption) (*ImageSummary, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImageSummary)
+	err := c.cc.Invoke(ctx, ImageService_InspectImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *imageServiceClient) PruneImages(ctx context.Context, in *PruneImagesRequest, opts ...grpc.CallOption) (*PruneImagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PruneImagesResponse)
+	err := c.cc.Invoke(ctx, ImageService_PruneImages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ImageServiceServer is the server API for ImageService service.
 // All implementations must embed UnimplementedImageServiceServer
 // for forward compatibility.
@@ -412,6 +436,8 @@ type ImageServiceServer interface {
 	PullImage(*PullImageRequest, grpc.ServerStreamingServer[PullImageEvent]) error
 	RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error)
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
+	InspectImage(context.Context, *InspectImageRequest) (*ImageSummary, error)
+	PruneImages(context.Context, *PruneImagesRequest) (*PruneImagesResponse, error)
 	mustEmbedUnimplementedImageServiceServer()
 }
 
@@ -430,6 +456,12 @@ func (UnimplementedImageServiceServer) RemoveImage(context.Context, *RemoveImage
 }
 func (UnimplementedImageServiceServer) ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListImages not implemented")
+}
+func (UnimplementedImageServiceServer) InspectImage(context.Context, *InspectImageRequest) (*ImageSummary, error) {
+	return nil, status.Error(codes.Unimplemented, "method InspectImage not implemented")
+}
+func (UnimplementedImageServiceServer) PruneImages(context.Context, *PruneImagesRequest) (*PruneImagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PruneImages not implemented")
 }
 func (UnimplementedImageServiceServer) mustEmbedUnimplementedImageServiceServer() {}
 func (UnimplementedImageServiceServer) testEmbeddedByValue()                      {}
@@ -499,6 +531,42 @@ func _ImageService_ListImages_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ImageService_InspectImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InspectImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageServiceServer).InspectImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageService_InspectImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageServiceServer).InspectImage(ctx, req.(*InspectImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ImageService_PruneImages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PruneImagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageServiceServer).PruneImages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageService_PruneImages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageServiceServer).PruneImages(ctx, req.(*PruneImagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ImageService_ServiceDesc is the grpc.ServiceDesc for ImageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -513,6 +581,14 @@ var ImageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListImages",
 			Handler:    _ImageService_ListImages_Handler,
+		},
+		{
+			MethodName: "InspectImage",
+			Handler:    _ImageService_InspectImage_Handler,
+		},
+		{
+			MethodName: "PruneImages",
+			Handler:    _ImageService_PruneImages_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

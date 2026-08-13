@@ -2,6 +2,7 @@ package image
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 )
@@ -23,7 +24,6 @@ func parseDockerHubReference(value string) (dockerHubReference, error) {
 		storageName: encodeStorageName(canonical),
 	}, nil
 }
-
 
 func StorageName(value string) (string, error) {
 	canonical, _, _, err := canonicalDockerHubReference(value)
@@ -97,4 +97,16 @@ func encodeStorageName(value string) string {
 		builder.WriteByte(hex[char&15])
 	}
 	return builder.String()
+}
+
+func decodeStorageName(value string) (string, error) {
+	reference, err := url.PathUnescape(value)
+	if err != nil {
+		return "", fmt.Errorf("decode image storage name %q: %w", value, err)
+	}
+	canonical, _, _, err := canonicalDockerHubReference(reference)
+	if err != nil || encodeStorageName(canonical) != value {
+		return "", fmt.Errorf("invalid encoded image storage name %q", value)
+	}
+	return canonical, nil
 }

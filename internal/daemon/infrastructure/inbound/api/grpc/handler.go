@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
 	grpc "google.golang.org/grpc"
 
@@ -51,7 +52,7 @@ func (d *DaemonHandler) StopContainer(ctx context.Context, req *pb.StopRequest) 
 func (d *DaemonHandler) RemoveContainer(ctx context.Context, req *pb.RemoveRequest) (*pb.RemoveResponse, error) {
 	command := MapRemoveRequestToCommand(req)
 	serviveResponse, err := d.containerService.Remove(ctx, command)
-	if err != nil{
+	if err != nil {
 		return &pb.RemoveResponse{}, err
 	}
 	return MapRemoveResponseToProto(serviveResponse), nil
@@ -67,13 +68,13 @@ func (d *DaemonHandler) InspectContainer(ctx context.Context, req *pb.InspectReq
 }
 
 func (d *DaemonHandler) AttachContainer(req grpc.BidiStreamingServer[pb.AttachRequest, pb.AttachResponse]) error {
-	return d.containerService.Attach(req.Context(), &grpcStream{stream:req})
+	return d.containerService.Attach(req.Context(), &grpcStream{stream: req})
 }
 
 func (d *DaemonHandler) ContainersList(ctx context.Context, req *pb.PsRequest) (*pb.PsResponse, error) {
 	command := application.PsCommand{}
 	serviceResponse, err := d.containerService.PsInspect(ctx, command)
-	if err != nil{
+	if err != nil {
 		return &pb.PsResponse{}, err
 	}
 	containers := MapPsResponseToProto(serviceResponse)
@@ -88,11 +89,61 @@ func (d *DaemonHandler) PullImage(req *pb.PullImageRequest, stream pb.ImageServi
 }
 
 func (d *DaemonHandler) RemoveImage(ctx context.Context, req *pb.RemoveImageRequest) (*pb.RemoveImageResponse, error) {
-	// TODO: реализовать заглушку для удаления образа
-	return &pb.RemoveImageResponse{}, nil
+	references := req.GetImageReferences()
+	if len(references) == 0 && req.GetImageId() != "" {
+		references = []string{req.GetImageId()}
+	}
+	if len(references) == 0 {
+		return nil, fmt.Errorf("at least one image reference is required")
+	}
+	response := &pb.RemoveImageResponse{Status: "removed"}
+	seen := make(map[string]struct{}, len(references))
+	for _, reference := range references {
+		if _, ok := seen[reference]; ok {
+			continue
+		}
+		seen[reference] = struct{}{}
+		result, err := d.imageService.Remove(ctx, imageservice.RemoveCommand{ImageIdentify: reference, Force: req.GetForce()})
+		if err != nil {
+			response.Failures = append(response.Failures, &pb.ImageOperationError{Reference: reference, Error: err.Error()})
+			continue
+		}
+		response.Images = append(response.Images, &pb.RemovedImage{Reference: result.Reference, Digest: result.Digest})
+	}
+	if len(response.Failures) > 0 {
+		response.Status = "partial"
+	}
+	return response, nil
 }
 
 func (d *DaemonHandler) ListImages(ctx context.Context, req *pb.ListImagesRequest) (*pb.ListImagesResponse, error) {
-	// TODO: реализовать заглушку для получения списка образов
-	return &pb.ListImagesResponse{}, nil
+	images, err := d.imageService.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.ListImagesResponse{Images: MapImagesToProto(images)}, nil
+}
+
+func (d *DaemonHandler) InspectImage(ctx context.Context, req *pb.InspectImageRequest) (*pb.ImageSummary, error) {
+	image, err := d.imageService.Inspect(ctx, req.GetImageReference())
+	if err != nil {
+		return nil, err
+	}
+	return MapImageToProto(image), nil
+}
+
+func (d *DaemonHandler) PruneImages(ctx context.Context, req *pb.PruneImagesRequest) (*pb.PruneImagesResponse, error) {
+	result, err := d.imageService.Prune(ctx, imageservice.PruneCommand{All: req.GetAll(), DryRun: req.GetDryRun()})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.PruneImagesResponse{
+		DeletedReferences:     result.DeletedReferences,
+		DeletedManifests:      result.DeletedManifests,
+		DeletedRootfs:         result.DeletedRootfs,
+		DeletedLayers:         result.DeletedLayers,
+		QuarantinedReferences: result.QuarantinedReferences,
+		ReclaimedBytes:        result.ReclaimedBytes,
+		DryRun:                req.GetDryRun(),
+	}, nil
 }

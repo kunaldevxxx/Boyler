@@ -38,7 +38,7 @@ func NewContainerService(d Deps) ContainerService {
 		remover:   NewRemover(d),
 		restarter: NewRestarter(d),
 		attacher:  NewAttacher(d),
-		cursor: NewCursor(d),
+		cursor:    NewCursor(d),
 	}
 }
 
@@ -70,7 +70,7 @@ func (c *containerService) Restart(ctx context.Context, cmd RestartContainerComm
 	return c.restarter.Execute(ctx, cmd)
 }
 
-func (c *containerService) Attach(ctx context.Context, stream AttachStream) error{
+func (c *containerService) Attach(ctx context.Context, stream AttachStream) error {
 	return c.attacher.Execute(ctx, stream)
 }
 

@@ -3,14 +3,16 @@ package core
 import "time"
 
 type Container struct {
-	ID        string
-	PID       int
-	Name string
-	ImageID   string
-	Status Condition
-	CreatedAt time.Time
-	StartedAt time.Time
-	Config    ContainerConfig
+	ID           string
+	PID          int
+	Name         string
+	ImageID      string
+	ImageDigest  string
+	RootfsDigest string
+	Status       Condition
+	CreatedAt    time.Time
+	StartedAt    time.Time
+	Config       ContainerConfig
 }
 
 type ContainerConfig struct {
@@ -41,7 +43,7 @@ type Condition string
 
 const (
 	StatusDeleted Condition = "deleted"
-	StatusRunning  Condition = "running"
-	StatusStopped  Condition = "stopped"
-	StatusFreeze Condition = "pause"
+	StatusRunning Condition = "running"
+	StatusStopped Condition = "stopped"
+	StatusFreeze  Condition = "pause"
 )

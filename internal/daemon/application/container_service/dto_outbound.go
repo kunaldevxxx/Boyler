@@ -5,12 +5,12 @@ import (
 )
 
 type ContainerContext struct {
-	ID 		string
+	ID string
 }
 
 type CreateContainerResponse struct {
 	ContainerContext
-	Status 	  string
+	Status string
 }
 
 type StartContainerResponse struct {
@@ -51,11 +51,10 @@ type InspectContainerResponse struct {
 	Resources   core.Restriction
 }
 
-
 type AttachOutboundEvent struct {
 	Stdout []byte
 }
 
-type PsResponse struct{
+type PsResponse struct {
 	ContainerList []*InspectContainerResponse
 }

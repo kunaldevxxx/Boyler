@@ -6,11 +6,11 @@ import (
 
 type CreateContainerCommand struct {
 	ContainerName string
-	ImageName string
-	Hostname  string
-	Env       []string
-	Args      []string
-	Limits    core.Restriction
+	ImageName     string
+	Hostname      string
+	Env           []string
+	Args          []string
+	Limits        core.Restriction
 }
 
 type CreateContainerOption func(*CreateContainerCommand)
@@ -20,7 +20,6 @@ func WithImage(image string) CreateContainerOption {
 		c.ImageName = image
 	}
 }
-
 
 func WithHostname(hostname string) CreateContainerOption {
 	return func(c *CreateContainerCommand) {
@@ -74,7 +73,6 @@ func NewCreateContainerCommand(opts ...CreateContainerOption) CreateContainerCom
 	return cmd
 }
 
-
 type StartContainerCommand struct {
 	ContainerContext
 }
@@ -90,7 +88,6 @@ type RemoveContainerCommand struct {
 type RestartContainerCommand struct {
 	ContainerContext
 }
-
 
 type AttachContainerCommand struct {
 	ContainerContext
@@ -108,7 +105,7 @@ type InspectContainerCommand struct {
 	ContainerContext
 }
 
-type PsCommand struct{
+type PsCommand struct {
 	mock bool
 }
 

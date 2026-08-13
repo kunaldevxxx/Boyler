@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-
 type DockerHubPuller struct {
 	HTTPClient *http.Client
 	Platform   Platform
@@ -89,6 +88,11 @@ func (p *DockerHubPuller) Pull(ctx context.Context, ref string, destDir string) 
 		SchemaVersion:  2,
 		ManifestDigest: digest,
 		Layers:         manifest.Layers,
+	}); err != nil {
+		return "", err
+	}
+	if err := store.writeImageMetadata(imagePath, ref, layersInfo{
+		SchemaVersion: 2, ManifestDigest: digest, Layers: manifest.Layers,
 	}); err != nil {
 		return "", err
 	}

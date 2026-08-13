@@ -73,12 +73,10 @@ func (a *Attacher) Execute(ctx context.Context, stream AttachStream) error {
 	return nil
 }
 
-
 func observer(ctx context.Context, slave io.ReadWriteCloser) {
 	<-ctx.Done()
 	slave.Close()
 }
-
 
 func grpcStreamReceiver(ctx context.Context, cancel context.CancelFunc, stream AttachStream, ch chan<- []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -89,7 +87,7 @@ func grpcStreamReceiver(ctx context.Context, cancel context.CancelFunc, stream A
 			cancel()
 			return
 		}
-		
+
 		select {
 		case <-ctx.Done():
 			return
@@ -97,7 +95,6 @@ func grpcStreamReceiver(ctx context.Context, cancel context.CancelFunc, stream A
 		}
 	}
 }
-
 
 func ptyWriter(ctx context.Context, cancel context.CancelFunc, slave io.ReadWriteCloser, ch <-chan []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -116,7 +113,6 @@ func ptyWriter(ctx context.Context, cancel context.CancelFunc, slave io.ReadWrit
 		}
 	}
 }
-
 
 func ptyReader(ctx context.Context, cancel context.CancelFunc, slave io.ReadWriteCloser, ch chan<- []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -141,7 +137,7 @@ func ptyReader(ctx context.Context, cancel context.CancelFunc, slave io.ReadWrit
 func grpcStreamSender(ctx context.Context, cancel context.CancelFunc, stream AttachStream, ch <-chan []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log := logger.FromContext(ctx)
-	
+
 	for {
 		select {
 		case <-ctx.Done():

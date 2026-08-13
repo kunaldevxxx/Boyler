@@ -4,13 +4,15 @@ import (
 	"context"
 )
 
-
 type VolumeManager interface {
 	// CreateMountPoints create upperdir, workdir and merged for each container
 	CreateMountPoints(ctx context.Context, containerID string) error
 
 	// Mount build layers (lowerdir from image + upperdir) to merged
 	Mount(ctx context.Context, containerID string, imageName string) error
+
+	// MountRootfs mounts an immutable, already resolved image rootfs.
+	MountRootfs(ctx context.Context, containerID string, rootfsPath string) error
 
 	// Unmount remount merged before delete
 	Unmount(ctx context.Context, containerID string) error

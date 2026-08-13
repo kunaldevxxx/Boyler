@@ -25,7 +25,6 @@ func MapStopResponseToProto(resp *application.StopContainerResponse) *gen.StopRe
 	return &gen.StopResponse{ContainerId: resp.ID}
 }
 
-
 func MapRemoveResponseToProto(resp *application.RemoveContainerResponse) *gen.RemoveResponse {
 	return &gen.RemoveResponse{ContainerId: resp.ID}
 }
@@ -33,25 +32,25 @@ func MapRemoveResponseToProto(resp *application.RemoveContainerResponse) *gen.Re
 func MapInspectResponseToProto(resp *application.InspectContainerResponse) *gen.InspectResponse {
 	return &gen.InspectResponse{
 		ContainerId: resp.ContainerID,
-		Pid: resp.Pid,
-		ImageId: resp.ImageID,
-		CreatedAt: resp.CreatedAt,
-		StartedAt: resp.StartedAt,
-		Env: resp.Env,
-		Args: resp.Args,
-		Status: resp.Status,
-		Hostname: resp.Hostname,
+		Pid:         resp.Pid,
+		ImageId:     resp.ImageID,
+		CreatedAt:   resp.CreatedAt,
+		StartedAt:   resp.StartedAt,
+		Env:         resp.Env,
+		Args:        resp.Args,
+		Status:      resp.Status,
+		Hostname:    resp.Hostname,
 		Resources: &gen.ResourceLimits{
 			Memory: &gen.MemoryRestriction{
-				Max: *resp.Resources.Memory.Max,
+				Max:   *resp.Resources.Memory.Max,
 				Exist: true,
 			},
 			Cpu: &gen.CPURestriction{
 				Weight: *resp.Resources.CPU.Weight,
-				Quota: *resp.Resources.CPU.Quota,
+				Quota:  *resp.Resources.CPU.Quota,
 				Period: *resp.Resources.CPU.Period,
-				Cpus: resp.Resources.CPU.Cpus,
-				Mems: resp.Resources.CPU.Mems,
+				Cpus:   resp.Resources.CPU.Cpus,
+				Mems:   resp.Resources.CPU.Mems,
 			},
 		},
 	}
@@ -78,11 +77,30 @@ func MapPsResponseToProto(resp []*core.Container) []*gen.ContainerListItem {
 	return items
 }
 
-func MapCoreToProtoEvent(event *core.PullingEvent) *gen.PullImageEvent{
+func MapCoreToProtoEvent(event *core.PullingEvent) *gen.PullImageEvent {
 	return &gen.PullImageEvent{
-		Status: event.Status,
-		Layid: event.LayId,
+		Status:   event.Status,
+		Layid:    event.LayId,
 		Progress: event.Progress,
-		Total: event.Total,
+		Total:    event.Total,
 	}
+}
+
+func MapImageToProto(image *core.Image) *gen.ImageSummary {
+	if image == nil {
+		return nil
+	}
+	return &gen.ImageSummary{
+		Id: image.ID, RepoTag: image.Reference, Size: image.Size,
+		CreatedAt: image.CreatedAt.Format(time.RFC3339), Reference: image.Reference,
+		Digest: image.Digest, RootfsDigest: image.RootfsDigest, Layers: image.Layers,
+	}
+}
+
+func MapImagesToProto(images []*core.Image) []*gen.ImageSummary {
+	result := make([]*gen.ImageSummary, 0, len(images))
+	for _, image := range images {
+		result = append(result, MapImageToProto(image))
+	}
+	return result
 }

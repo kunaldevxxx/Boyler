@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-type Stopper struct{
+type Stopper struct {
 	runtime run.Runtime
 	fs      overlay.VolumeManager
 	images  layer.ImageManager
@@ -40,7 +40,7 @@ func (s *Stopper) Execute(ctx context.Context, cmd StopContainerCommand) (*StopC
 	id := cmd.ID
 	container, err := s.store.Get(ctx, id)
 	if err != nil {
-		return nil, &core.InternalDaemonError{Op:"core container", Err: err}
+		return nil, &core.InternalDaemonError{Op: "core container", Err: err}
 	}
 	if container.Status == core.StatusRunning {
 		if err := s.killMasterProcess(ctx, id); err != nil {
@@ -60,9 +60,9 @@ func (s *Stopper) Execute(ctx context.Context, cmd StopContainerCommand) (*StopC
 			return nil, err
 		}
 		return &StopContainerResponse{
-			ContainerContext:ContainerContext{ID: id},
-			}, nil
-	}else{
+			ContainerContext: ContainerContext{ID: id},
+		}, nil
+	} else {
 		return nil, &core.InvalidUserCommandError{Op: "stop", Err: core.ErrContainerNotRunning}
 	}
 }
@@ -103,8 +103,8 @@ func (s *Stopper) killCgroup(ctx context.Context, id string) error {
 }
 
 func (s *Stopper) unmountFilesystem(ctx context.Context, id string) error {
-	if err := s.fs.Unmount(ctx, id); err != nil{
-		return &core.FilesystemError{Op:"save fs", Err: err}
+	if err := s.fs.Unmount(ctx, id); err != nil {
+		return &core.FilesystemError{Op: "save fs", Err: err}
 	}
 	return nil
 }

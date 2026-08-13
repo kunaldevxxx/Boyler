@@ -27,6 +27,11 @@ func TestRootHelpContainsBrandAndGroups(t *testing.T) {
 		"--color",
 		"daemon status",
 		"system info",
+		"image inspect",
+		"image prune",
+		"image rm",
+		"images",
+		"rmi",
 	} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("help output does not contain %q:\n%s", expected, output.String())

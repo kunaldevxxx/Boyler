@@ -155,13 +155,13 @@ func printContainerTable(output io.Writer, rows []containerRow) {
 		style  func(string) string
 	}
 	columns := []column{
-		{header: "CONTAINER ID", value: func(row containerRow) string { return row.ID }, style: theme.Muted},
+		{header: "CONTAINER ID", value: func(row containerRow) string { return row.ID }},
 		{header: "IMAGE", value: func(row containerRow) string { return row.Image }},
 	}
 	if !theme.Terminal() || theme.Width() >= 100 {
 		columns = append(columns,
 			column{header: "COMMAND", value: func(row containerRow) string { return row.Command }},
-			column{header: "CREATED", value: func(row containerRow) string { return row.Created }, style: theme.Muted},
+			column{header: "CREATED", value: func(row containerRow) string { return row.Created }},
 		)
 	}
 	columns = append(columns,
@@ -180,7 +180,7 @@ func printContainerTable(output io.Writer, rows []containerRow) {
 	}
 
 	for index, col := range columns {
-		writeTableCell(output, theme.Label(col.header), widths[index], index == len(columns)-1)
+		writeTableCell(output, col.header, widths[index], index == len(columns)-1)
 	}
 	fmt.Fprintln(output)
 	for _, row := range rows {
@@ -215,7 +215,7 @@ func terminalStatus(theme ui.Theme, status string) string {
 	case strings.HasPrefix(status, "Exited"):
 		return theme.Error(theme.Symbol("○", "-") + " " + status)
 	default:
-		return theme.Muted(status)
+		return status
 	}
 }
 

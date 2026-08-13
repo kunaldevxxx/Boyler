@@ -1,57 +1,73 @@
 package application
 
 import (
-	core "boyler/internal/daemon/core"
-	limits "boyler/internal/daemon/infrastructure/outbound/limits"
-	layer "boyler/internal/daemon/infrastructure/outbound/image"
-	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	net "boyler/internal/daemon/application/network_service"
+	core "boyler/internal/daemon/core"
+	layer "boyler/internal/daemon/infrastructure/outbound/image"
+	limits "boyler/internal/daemon/infrastructure/outbound/limits"
+	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
 	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
 	run "boyler/internal/runtime"
 	"context"
-	"log/slog"
-	"path/filepath"
-	"time"
+	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
 )
 
 type Creator struct {
-	logger  *slog.Logger
-	runtime run.Runtime
-	fs      overlay.VolumeManager
-	images  layer.ImageManager
-	network net.NetworkService
-	reg     registry.ResourcesRegistry
-	store   *storage.ContainerRepository
-	conf    ServiceConfig
-	cgroupFactory limits.Factory
+	logger         *slog.Logger
+	runtime        run.Runtime
+	fs             overlay.VolumeManager
+	images         layer.ImageManager
+	network        net.NetworkService
+	reg            registry.ResourcesRegistry
+	store          *storage.ContainerRepository
+	conf           ServiceConfig
+	cgroupFactory  limits.Factory
+	imageLifecycle *sync.RWMutex
 }
 
 func NewCreator(d Deps) *Creator {
 	return &Creator{
-		logger:  d.Logger,
-		runtime: d.Runtime,
-		fs:      d.FS,
-		images:  d.Images,
-		network: d.Network,
-		reg:     d.Reg,
-		store:   d.Store,
-		cgroupFactory: d.CgroupFactory,
-		conf:    d.Conf,
+		logger:         d.Logger,
+		runtime:        d.Runtime,
+		fs:             d.FS,
+		images:         d.Images,
+		network:        d.Network,
+		reg:            d.Reg,
+		store:          d.Store,
+		cgroupFactory:  d.CgroupFactory,
+		conf:           d.Conf,
+		imageLifecycle: d.ImageLifecycle,
 	}
 }
 
-
 func (c *Creator) ExecuteCreate(ctx context.Context, cmd CreateContainerCommand) (*CreateContainerResponse, error) {
+	if c.imageLifecycle != nil {
+		c.imageLifecycle.RLock()
+		defer c.imageLifecycle.RUnlock()
+	}
 	id := uuid.New().String()
 	//id := "8e6ff240-a1a5-4642-a58e-1a53b3222ee0" // using by default like test
 
 	if err := c.extractImage(ctx, cmd.ImageName); err != nil {
 		return nil, err
 	}
+	resolved, err := c.images.Resolve(ctx, cmd.ImageName)
+	if err != nil {
+		return nil, &core.ImageError{Image: cmd.ImageName, Err: err}
+	}
+	if err := c.persistImageIdentity(id, resolved); err != nil {
+		return nil, &core.FilesystemError{Op: "persist_image_identity", Err: err}
+	}
 
-	state, pid, createTime, startTime, err := c.provision(ctx, id, cmd.ImageName, &cmd.Limits)
+	state, pid, createTime, startTime, err := c.provision(ctx, id, resolved.RootfsPath, &cmd.Limits)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +78,7 @@ func (c *Creator) ExecuteCreate(ctx context.Context, cmd CreateContainerCommand)
 		WithPid(int64(pid)),
 		WithTime(createTime, startTime),
 		WithCoreName(cmd.ContainerName),
+		WithImageIdentity(resolved.Digest, resolved.RootfsDigest),
 	)
 	c.store.Save(ctx, *containerCore)
 
@@ -71,14 +88,67 @@ func (c *Creator) ExecuteCreate(ctx context.Context, cmd CreateContainerCommand)
 	}, nil
 }
 
+const containerImageIdentityFile = ".boyler-image.json"
+
+type persistedImageIdentity struct {
+	Reference    string `json:"reference"`
+	ImageDigest  string `json:"imageDigest"`
+	RootfsDigest string `json:"rootfsDigest"`
+}
+
+func (c *Creator) persistImageIdentity(id string, image *core.Image) error {
+	directory := filepath.Join(c.conf.ContainerDir, id)
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return fmt.Errorf("create container directory: %w", err)
+	}
+	data, err := json.Marshal(persistedImageIdentity{Reference: image.Reference, ImageDigest: image.Digest, RootfsDigest: image.RootfsDigest})
+	if err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".boyler-image-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	committed := false
+	defer func() {
+		_ = temporary.Close()
+		if !committed {
+			_ = os.Remove(temporaryPath)
+		}
+	}()
+	if _, err := temporary.Write(data); err != nil {
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, filepath.Join(directory, containerImageIdentityFile)); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
 func (c *Creator) ExecuteStart(ctx context.Context, cmd StartContainerCommand) (*StartContainerResponse, error) {
+	if c.imageLifecycle != nil {
+		c.imageLifecycle.RLock()
+		defer c.imageLifecycle.RUnlock()
+	}
 	container, err := c.store.Get(ctx, cmd.ID)
 	if err != nil {
 		return nil, &core.InvalidUserCommandError{Op: "start", Err: err}
 	}
 
 	id := cmd.ID
-	_, pid, _, startTime, err := c.provision(ctx, id, container.ImageID, &container.Config.Resources)
+	rootfsPath, err := c.containerRootfs(container)
+	if err != nil {
+		return nil, &core.ImageError{Image: container.ImageID, Err: err}
+	}
+	_, pid, _, startTime, err := c.provision(ctx, id, rootfsPath, &container.Config.Resources)
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +164,8 @@ func (c *Creator) ExecuteStart(ctx context.Context, cmd StartContainerCommand) (
 	}, nil
 }
 
-
-func (c *Creator) provision(ctx context.Context, id, imageName string, lim *core.Restriction) (state *run.State, pid int, createTime, startTime time.Time, err error) {
-	if err = c.prepareFilesystem(ctx, id, imageName); err != nil {
+func (c *Creator) provision(ctx context.Context, id, rootfsPath string, lim *core.Restriction) (state *run.State, pid int, createTime, startTime time.Time, err error) {
+	if err = c.prepareFilesystem(ctx, id, rootfsPath); err != nil {
 		return nil, 0, time.Time{}, time.Time{}, err
 	}
 
@@ -136,18 +205,25 @@ func (c *Creator) extractImage(ctx context.Context, image string) error {
 	return nil
 }
 
-func (c *Creator) prepareFilesystem(ctx context.Context, id, imageName string) error {
+func (c *Creator) prepareFilesystem(ctx context.Context, id, rootfsPath string) error {
 	if err := c.fs.CreateMountPoints(ctx, id); err != nil {
 		c.logger.Error("Failed to prepare container filesystem", "err", err, "container_id", id)
 		return &core.FilesystemError{Op: "create_mount_points", Err: err}
 	}
 
-	if err := c.fs.Mount(ctx, id, imageName); err != nil {
-		c.logger.Error("Failed to mount container filesystem", "err", err, "image_name", imageName)
+	if err := c.fs.MountRootfs(ctx, id, rootfsPath); err != nil {
+		c.logger.Error("Failed to mount container filesystem", "err", err, "rootfs", rootfsPath)
 		return &core.FilesystemError{Op: "mount", Err: err}
 	}
 
 	return nil
+}
+
+func (c *Creator) containerRootfs(container *core.Container) (string, error) {
+	if container.RootfsDigest != "" {
+		return c.images.GetRootfsPathByDigest(container.RootfsDigest)
+	}
+	return c.images.GetRootfsPath(container.ImageID), nil
 }
 
 func (c *Creator) createRuntimeContainer(ctx context.Context, id, bundlePath string) error {
