@@ -11,9 +11,7 @@ import (
 	"time"
 )
 
-// DockerHubPuller coordinates the components involved in pulling an image.
-// HTTP transport, manifest resolution, layer transfer and disk layout live in
-// dedicated components; this type only describes the workflow.
+
 type DockerHubPuller struct {
 	HTTPClient *http.Client
 	Platform   Platform
@@ -98,8 +96,6 @@ func (p *DockerHubPuller) Pull(ctx context.Context, ref string, destDir string) 
 	return digest, nil
 }
 
-// dockerHubToken is kept as a small compatibility seam for package callers;
-// the HTTP exchange itself belongs to dockerHubRegistry.
 func (p *DockerHubPuller) dockerHubToken(ctx context.Context, repository string) (string, error) {
 	if !strings.Contains(repository, "/") {
 		repository = "library/" + repository

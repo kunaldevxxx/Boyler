@@ -24,8 +24,7 @@ func parseDockerHubReference(value string) (dockerHubReference, error) {
 	}, nil
 }
 
-// StorageName returns an injective, filesystem-safe key for a Docker Hub
-// reference. Equivalent spellings such as alpine and alpine:latest share it.
+
 func StorageName(value string) (string, error) {
 	canonical, _, _, err := canonicalDockerHubReference(value)
 	if err != nil {
@@ -34,8 +33,6 @@ func StorageName(value string) (string, error) {
 	return encodeStorageName(canonical), nil
 }
 
-// LegacyStorageName supports images downloaded before injective reference
-// encoding was introduced.
 func LegacyStorageName(value string) (string, error) {
 	value = strings.TrimPrefix(value, "docker.io/")
 	if err := validateReferenceText(value); err != nil {

@@ -1,11 +1,8 @@
 package ui
 
 import (
-	"fmt"
 	"io"
 	"os"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
@@ -92,36 +89,6 @@ func (t Theme) style(value, color string, bold bool) string {
 		return value
 	}
 	return t.render.NewStyle().Foreground(lipgloss.Color(color)).Bold(bold).Render(value)
-}
-
-func (t Theme) Gradient(value string) string {
-	if !t.enabled || utf8.RuneCountInString(value) < 2 {
-		return value
-	}
-	runes := []rune(value)
-	var b strings.Builder
-	for i, char := range runes {
-		fraction := float64(i) / float64(len(runes)-1)
-		color := gradientColor(fraction)
-		b.WriteString(t.render.NewStyle().Foreground(lipgloss.Color(color)).Bold(true).Render(string(char)))
-	}
-	return b.String()
-}
-
-// The brand gradient passes through orange, pink and violet.
-func gradientColor(position float64) string {
-	type rgb struct{ r, g, b float64 }
-	stops := []rgb{{255, 138, 61}, {255, 77, 141}, {155, 109, 255}}
-	segment := position * float64(len(stops)-1)
-	index := int(segment)
-	if index >= len(stops)-1 {
-		index = len(stops) - 2
-		segment = float64(len(stops) - 1)
-	}
-	local := segment - float64(index)
-	from, to := stops[index], stops[index+1]
-	lerp := func(a, b float64) int { return int(a + (b-a)*local) }
-	return fmt.Sprintf("#%02X%02X%02X", lerp(from.r, to.r), lerp(from.g, to.g), lerp(from.b, to.b))
 }
 
 func isTerminal(writer io.Writer) bool {

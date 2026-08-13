@@ -17,7 +17,6 @@ type imageStore struct {
 }
 
 type layersInfo struct {
-	// Num is retained for reading the legacy layer_N.tar.gz layout.
 	Num            int                `json:"num,omitempty"`
 	SchemaVersion  int                `json:"schemaVersion,omitempty"`
 	ManifestDigest string             `json:"manifestDigest,omitempty"`
