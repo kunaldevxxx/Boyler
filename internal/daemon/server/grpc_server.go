@@ -25,6 +25,11 @@ type Server struct {
 	socketGroup  string
 }
 
+const (
+	unaryRequestTimeout = 20 * time.Second
+	imagePruneTimeout   = 2 * time.Minute
+)
+
 type ServerOption func(*Server)
 
 func WithSocketGroup(group string) ServerOption {
@@ -33,7 +38,9 @@ func WithSocketGroup(group string) ServerOption {
 
 func NewGrpcServer(socketPath string, daemonHandler *grpchandler.DaemonHandler, inspectionHandler *grpchandler.InspectionHandler, options ...ServerOption) *Server {
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(inter.ContextInterceptor(15*time.Second)),
+		grpc.UnaryInterceptor(inter.ContextInterceptor(unaryRequestTimeout, map[string]time.Duration{
+			pb.ImageService_PruneImages_FullMethodName: imagePruneTimeout,
+		})),
 		grpc.MaxRecvMsgSize(4<<20), grpc.MaxSendMsgSize(4<<20),
 	)
 	pb.RegisterContainerServiceServer(grpcServer, daemonHandler)

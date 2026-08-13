@@ -44,7 +44,7 @@ var systemInfoCmd = &cobra.Command{
 			info = collectSystemInformation()
 		} else {
 			loadEnv()
-			ctx, cancel := context.WithTimeout(cmd.Context(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 			defer cancel()
 			remote, err := daemonSystemInformation(ctx)
 			if err != nil {

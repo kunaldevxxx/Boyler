@@ -52,7 +52,7 @@ var imageInspectCmd = &cobra.Command{
 			return commandError(err)
 		}
 		defer conn.Close()
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 		defer cancel()
 		response, err := client.InspectImage(ctx, &pb.InspectImageRequest{ImageReference: args[0]})
 		if err != nil {
@@ -110,7 +110,7 @@ func runImages(cmd *cobra.Command, _ []string) error {
 		return commandError(err)
 	}
 	defer conn.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 	defer cancel()
 	response, err := client.ListImages(ctx, &pb.ListImagesRequest{})
 	if err != nil {

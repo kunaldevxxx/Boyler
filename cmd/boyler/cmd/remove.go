@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"time"
 
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
 	"github.com/spf13/cobra"
@@ -27,7 +26,7 @@ var removeCmd = &cobra.Command{
 		defer conn.Close()
 
 		req := &pb.RemoveRequest{ContainerId: id}
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 		defer cancel()
 
 		_, err = client.RemoveContainer(ctx, req)

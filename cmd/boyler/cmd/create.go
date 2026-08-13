@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"strings"
-	"time"
 
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
 	"github.com/spf13/cobra"
@@ -84,7 +83,7 @@ var createCmd = &cobra.Command{
 			},
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 		defer cancel()
 
 		res, err := client.CreateContainer(ctx, req)

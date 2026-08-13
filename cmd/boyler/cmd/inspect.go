@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"time"
 
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
 
@@ -31,7 +30,7 @@ var inspectCmd = &cobra.Command{
 		}
 		defer conn.Close()
 		req := &pb.InspectRequest{ContainerId: id}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 		defer cancel()
 
 		res, err := client.InspectContainer(ctx, req)
