@@ -1,8 +1,8 @@
 package application
 
 import (
-	core "boyler/internal/daemon/core"
 	net "boyler/internal/daemon/application/network_service"
+	core "boyler/internal/daemon/core"
 	overlay "boyler/internal/daemon/infrastructure/outbound/overlay"
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
 	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
@@ -19,7 +19,7 @@ type Remover struct {
 	fs      overlay.VolumeManager
 	reg     registry.ResourcesRegistry
 	store   *storage.ContainerRepository
-	network  net.NetworkService
+	network net.NetworkService
 }
 
 func NewRemover(d Deps) *Remover {
@@ -50,7 +50,7 @@ func (r *Remover) Execute(ctx context.Context, cmd RemoveContainerCommand) (*Rem
 		return nil, err
 	}
 	if err := r.store.Delete(ctx, cmd.ID); err != nil {
-		return nil, &core.InternalDaemonError{Err: err, Op:"execute"}
+		return nil, &core.InternalDaemonError{Err: err, Op: "execute"}
 	}
 	return &RemoveContainerResponse{
 		ContainerContext: ContainerContext{ID: cmd.ID},

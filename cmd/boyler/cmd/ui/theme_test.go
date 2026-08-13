@@ -8,8 +8,8 @@ import (
 
 func TestThemeNeverKeepsOutputPlain(t *testing.T) {
 	theme := NewTheme(&bytes.Buffer{}, ColorNever)
-	if actual := theme.Gradient("BOYLER"); actual != "BOYLER" {
-		t.Fatalf("plain gradient = %q", actual)
+	if actual := theme.Brand("BOYLER"); actual != "BOYLER" {
+		t.Fatalf("plain brand = %q", actual)
 	}
 	if actual := theme.Success("done"); actual != "done" {
 		t.Fatalf("plain success = %q", actual)
@@ -18,7 +18,7 @@ func TestThemeNeverKeepsOutputPlain(t *testing.T) {
 
 func TestThemeAlwaysRendersANSI(t *testing.T) {
 	theme := NewTheme(&bytes.Buffer{}, ColorAlways)
-	actual := theme.Gradient("BOYLER")
+	actual := theme.Brand("BOYLER")
 	if !strings.Contains(actual, "\x1b[") {
 		t.Fatalf("forced color output does not contain ANSI: %q", actual)
 	}

@@ -1442,10 +1442,12 @@ func (x *PullImageEvent) GetTotal() int64 {
 }
 
 type RemoveImageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ImageId       string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ImageId         string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	ImageReferences []string               `protobuf:"bytes,2,rep,name=image_references,json=imageReferences,proto3" json:"image_references,omitempty"`
+	Force           bool                   `protobuf:"varint,3,opt,name=force,proto3" json:"force,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RemoveImageRequest) Reset() {
@@ -1485,9 +1487,25 @@ func (x *RemoveImageRequest) GetImageId() string {
 	return ""
 }
 
+func (x *RemoveImageRequest) GetImageReferences() []string {
+	if x != nil {
+		return x.ImageReferences
+	}
+	return nil
+}
+
+func (x *RemoveImageRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
 type RemoveImageResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Images        []*RemovedImage        `protobuf:"bytes,2,rep,name=images,proto3" json:"images,omitempty"`
+	Failures      []*ImageOperationError `protobuf:"bytes,3,rep,name=failures,proto3" json:"failures,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1529,6 +1547,124 @@ func (x *RemoveImageResponse) GetStatus() string {
 	return ""
 }
 
+func (x *RemoveImageResponse) GetImages() []*RemovedImage {
+	if x != nil {
+		return x.Images
+	}
+	return nil
+}
+
+func (x *RemoveImageResponse) GetFailures() []*ImageOperationError {
+	if x != nil {
+		return x.Failures
+	}
+	return nil
+}
+
+type RemovedImage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reference     string                 `protobuf:"bytes,1,opt,name=reference,proto3" json:"reference,omitempty"`
+	Digest        string                 `protobuf:"bytes,2,opt,name=digest,proto3" json:"digest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovedImage) Reset() {
+	*x = RemovedImage{}
+	mi := &file_daemon_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovedImage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovedImage) ProtoMessage() {}
+
+func (x *RemovedImage) ProtoReflect() protoreflect.Message {
+	mi := &file_daemon_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovedImage.ProtoReflect.Descriptor instead.
+func (*RemovedImage) Descriptor() ([]byte, []int) {
+	return file_daemon_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RemovedImage) GetReference() string {
+	if x != nil {
+		return x.Reference
+	}
+	return ""
+}
+
+func (x *RemovedImage) GetDigest() string {
+	if x != nil {
+		return x.Digest
+	}
+	return ""
+}
+
+type ImageOperationError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reference     string                 `protobuf:"bytes,1,opt,name=reference,proto3" json:"reference,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImageOperationError) Reset() {
+	*x = ImageOperationError{}
+	mi := &file_daemon_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImageOperationError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImageOperationError) ProtoMessage() {}
+
+func (x *ImageOperationError) ProtoReflect() protoreflect.Message {
+	mi := &file_daemon_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImageOperationError.ProtoReflect.Descriptor instead.
+func (*ImageOperationError) Descriptor() ([]byte, []int) {
+	return file_daemon_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ImageOperationError) GetReference() string {
+	if x != nil {
+		return x.Reference
+	}
+	return ""
+}
+
+func (x *ImageOperationError) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 type ListImagesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1537,7 +1673,7 @@ type ListImagesRequest struct {
 
 func (x *ListImagesRequest) Reset() {
 	*x = ListImagesRequest{}
-	mi := &file_daemon_proto_msgTypes[24]
+	mi := &file_daemon_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1549,7 +1685,7 @@ func (x *ListImagesRequest) String() string {
 func (*ListImagesRequest) ProtoMessage() {}
 
 func (x *ListImagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[24]
+	mi := &file_daemon_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1562,7 +1698,7 @@ func (x *ListImagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListImagesRequest.ProtoReflect.Descriptor instead.
 func (*ListImagesRequest) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{24}
+	return file_daemon_proto_rawDescGZIP(), []int{26}
 }
 
 type ListImagesResponse struct {
@@ -1574,7 +1710,7 @@ type ListImagesResponse struct {
 
 func (x *ListImagesResponse) Reset() {
 	*x = ListImagesResponse{}
-	mi := &file_daemon_proto_msgTypes[25]
+	mi := &file_daemon_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1586,7 +1722,7 @@ func (x *ListImagesResponse) String() string {
 func (*ListImagesResponse) ProtoMessage() {}
 
 func (x *ListImagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[25]
+	mi := &file_daemon_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1599,7 +1735,7 @@ func (x *ListImagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListImagesResponse.ProtoReflect.Descriptor instead.
 func (*ListImagesResponse) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{25}
+	return file_daemon_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListImagesResponse) GetImages() []*ImageSummary {
@@ -1615,13 +1751,17 @@ type ImageSummary struct {
 	RepoTag       string                 `protobuf:"bytes,2,opt,name=repo_tag,json=repoTag,proto3" json:"repo_tag,omitempty"`
 	Size          int64                  `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Reference     string                 `protobuf:"bytes,5,opt,name=reference,proto3" json:"reference,omitempty"`
+	Digest        string                 `protobuf:"bytes,6,opt,name=digest,proto3" json:"digest,omitempty"`
+	RootfsDigest  string                 `protobuf:"bytes,7,opt,name=rootfs_digest,json=rootfsDigest,proto3" json:"rootfs_digest,omitempty"`
+	Layers        []string               `protobuf:"bytes,8,rep,name=layers,proto3" json:"layers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ImageSummary) Reset() {
 	*x = ImageSummary{}
-	mi := &file_daemon_proto_msgTypes[26]
+	mi := &file_daemon_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1633,7 +1773,7 @@ func (x *ImageSummary) String() string {
 func (*ImageSummary) ProtoMessage() {}
 
 func (x *ImageSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[26]
+	mi := &file_daemon_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1646,7 +1786,7 @@ func (x *ImageSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageSummary.ProtoReflect.Descriptor instead.
 func (*ImageSummary) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{26}
+	return file_daemon_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ImageSummary) GetId() string {
@@ -1677,6 +1817,222 @@ func (x *ImageSummary) GetCreatedAt() string {
 	return ""
 }
 
+func (x *ImageSummary) GetReference() string {
+	if x != nil {
+		return x.Reference
+	}
+	return ""
+}
+
+func (x *ImageSummary) GetDigest() string {
+	if x != nil {
+		return x.Digest
+	}
+	return ""
+}
+
+func (x *ImageSummary) GetRootfsDigest() string {
+	if x != nil {
+		return x.RootfsDigest
+	}
+	return ""
+}
+
+func (x *ImageSummary) GetLayers() []string {
+	if x != nil {
+		return x.Layers
+	}
+	return nil
+}
+
+type InspectImageRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ImageReference string                 `protobuf:"bytes,1,opt,name=image_reference,json=imageReference,proto3" json:"image_reference,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *InspectImageRequest) Reset() {
+	*x = InspectImageRequest{}
+	mi := &file_daemon_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InspectImageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InspectImageRequest) ProtoMessage() {}
+
+func (x *InspectImageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_daemon_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InspectImageRequest.ProtoReflect.Descriptor instead.
+func (*InspectImageRequest) Descriptor() ([]byte, []int) {
+	return file_daemon_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *InspectImageRequest) GetImageReference() string {
+	if x != nil {
+		return x.ImageReference
+	}
+	return ""
+}
+
+type PruneImagesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	All           bool                   `protobuf:"varint,1,opt,name=all,proto3" json:"all,omitempty"`
+	DryRun        bool                   `protobuf:"varint,2,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PruneImagesRequest) Reset() {
+	*x = PruneImagesRequest{}
+	mi := &file_daemon_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PruneImagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PruneImagesRequest) ProtoMessage() {}
+
+func (x *PruneImagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_daemon_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PruneImagesRequest.ProtoReflect.Descriptor instead.
+func (*PruneImagesRequest) Descriptor() ([]byte, []int) {
+	return file_daemon_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PruneImagesRequest) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
+func (x *PruneImagesRequest) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
+}
+
+type PruneImagesResponse struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	DeletedReferences     []string               `protobuf:"bytes,1,rep,name=deleted_references,json=deletedReferences,proto3" json:"deleted_references,omitempty"`
+	DeletedManifests      []string               `protobuf:"bytes,2,rep,name=deleted_manifests,json=deletedManifests,proto3" json:"deleted_manifests,omitempty"`
+	DeletedRootfs         []string               `protobuf:"bytes,3,rep,name=deleted_rootfs,json=deletedRootfs,proto3" json:"deleted_rootfs,omitempty"`
+	DeletedLayers         []string               `protobuf:"bytes,4,rep,name=deleted_layers,json=deletedLayers,proto3" json:"deleted_layers,omitempty"`
+	ReclaimedBytes        int64                  `protobuf:"varint,5,opt,name=reclaimed_bytes,json=reclaimedBytes,proto3" json:"reclaimed_bytes,omitempty"`
+	DryRun                bool                   `protobuf:"varint,6,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	QuarantinedReferences []string               `protobuf:"bytes,7,rep,name=quarantined_references,json=quarantinedReferences,proto3" json:"quarantined_references,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PruneImagesResponse) Reset() {
+	*x = PruneImagesResponse{}
+	mi := &file_daemon_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PruneImagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PruneImagesResponse) ProtoMessage() {}
+
+func (x *PruneImagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_daemon_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PruneImagesResponse.ProtoReflect.Descriptor instead.
+func (*PruneImagesResponse) Descriptor() ([]byte, []int) {
+	return file_daemon_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PruneImagesResponse) GetDeletedReferences() []string {
+	if x != nil {
+		return x.DeletedReferences
+	}
+	return nil
+}
+
+func (x *PruneImagesResponse) GetDeletedManifests() []string {
+	if x != nil {
+		return x.DeletedManifests
+	}
+	return nil
+}
+
+func (x *PruneImagesResponse) GetDeletedRootfs() []string {
+	if x != nil {
+		return x.DeletedRootfs
+	}
+	return nil
+}
+
+func (x *PruneImagesResponse) GetDeletedLayers() []string {
+	if x != nil {
+		return x.DeletedLayers
+	}
+	return nil
+}
+
+func (x *PruneImagesResponse) GetReclaimedBytes() int64 {
+	if x != nil {
+		return x.ReclaimedBytes
+	}
+	return 0
+}
+
+func (x *PruneImagesResponse) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
+}
+
+func (x *PruneImagesResponse) GetQuarantinedReferences() []string {
+	if x != nil {
+		return x.QuarantinedReferences
+	}
+	return nil
+}
+
 type AttachRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
@@ -1691,7 +2047,7 @@ type AttachRequest struct {
 
 func (x *AttachRequest) Reset() {
 	*x = AttachRequest{}
-	mi := &file_daemon_proto_msgTypes[27]
+	mi := &file_daemon_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1703,7 +2059,7 @@ func (x *AttachRequest) String() string {
 func (*AttachRequest) ProtoMessage() {}
 
 func (x *AttachRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[27]
+	mi := &file_daemon_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1716,7 +2072,7 @@ func (x *AttachRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachRequest.ProtoReflect.Descriptor instead.
 func (*AttachRequest) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{27}
+	return file_daemon_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *AttachRequest) GetPayload() isAttachRequest_Payload {
@@ -1784,7 +2140,7 @@ type AttachInit struct {
 
 func (x *AttachInit) Reset() {
 	*x = AttachInit{}
-	mi := &file_daemon_proto_msgTypes[28]
+	mi := &file_daemon_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1796,7 +2152,7 @@ func (x *AttachInit) String() string {
 func (*AttachInit) ProtoMessage() {}
 
 func (x *AttachInit) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[28]
+	mi := &file_daemon_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1809,7 +2165,7 @@ func (x *AttachInit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachInit.ProtoReflect.Descriptor instead.
 func (*AttachInit) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{28}
+	return file_daemon_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *AttachInit) GetContainerId() string {
@@ -1829,7 +2185,7 @@ type TerminalSize struct {
 
 func (x *TerminalSize) Reset() {
 	*x = TerminalSize{}
-	mi := &file_daemon_proto_msgTypes[29]
+	mi := &file_daemon_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1841,7 +2197,7 @@ func (x *TerminalSize) String() string {
 func (*TerminalSize) ProtoMessage() {}
 
 func (x *TerminalSize) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[29]
+	mi := &file_daemon_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1854,7 +2210,7 @@ func (x *TerminalSize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalSize.ProtoReflect.Descriptor instead.
 func (*TerminalSize) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{29}
+	return file_daemon_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *TerminalSize) GetWidth() uint32 {
@@ -1885,7 +2241,7 @@ type AttachResponse struct {
 
 func (x *AttachResponse) Reset() {
 	*x = AttachResponse{}
-	mi := &file_daemon_proto_msgTypes[30]
+	mi := &file_daemon_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1897,7 +2253,7 @@ func (x *AttachResponse) String() string {
 func (*AttachResponse) ProtoMessage() {}
 
 func (x *AttachResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[30]
+	mi := &file_daemon_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1910,7 +2266,7 @@ func (x *AttachResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachResponse.ProtoReflect.Descriptor instead.
 func (*AttachResponse) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{30}
+	return file_daemon_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *AttachResponse) GetPayload() isAttachResponse_Payload {
@@ -1978,7 +2334,7 @@ type ExitStatus struct {
 
 func (x *ExitStatus) Reset() {
 	*x = ExitStatus{}
-	mi := &file_daemon_proto_msgTypes[31]
+	mi := &file_daemon_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1990,7 +2346,7 @@ func (x *ExitStatus) String() string {
 func (*ExitStatus) ProtoMessage() {}
 
 func (x *ExitStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[31]
+	mi := &file_daemon_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2003,7 +2359,7 @@ func (x *ExitStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExitStatus.ProtoReflect.Descriptor instead.
 func (*ExitStatus) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{31}
+	return file_daemon_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ExitStatus) GetCode() int32 {
@@ -2022,7 +2378,7 @@ type PsResponse struct {
 
 func (x *PsResponse) Reset() {
 	*x = PsResponse{}
-	mi := &file_daemon_proto_msgTypes[32]
+	mi := &file_daemon_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2034,7 +2390,7 @@ func (x *PsResponse) String() string {
 func (*PsResponse) ProtoMessage() {}
 
 func (x *PsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[32]
+	mi := &file_daemon_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2047,7 +2403,7 @@ func (x *PsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PsResponse.ProtoReflect.Descriptor instead.
 func (*PsResponse) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{32}
+	return file_daemon_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *PsResponse) GetContainers() []*ContainerListItem {
@@ -2071,7 +2427,7 @@ type ContainerListItem struct {
 
 func (x *ContainerListItem) Reset() {
 	*x = ContainerListItem{}
-	mi := &file_daemon_proto_msgTypes[33]
+	mi := &file_daemon_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2083,7 +2439,7 @@ func (x *ContainerListItem) String() string {
 func (*ContainerListItem) ProtoMessage() {}
 
 func (x *ContainerListItem) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[33]
+	mi := &file_daemon_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2096,7 +2452,7 @@ func (x *ContainerListItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContainerListItem.ProtoReflect.Descriptor instead.
 func (*ContainerListItem) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{33}
+	return file_daemon_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ContainerListItem) GetContainerId() string {
@@ -2149,7 +2505,7 @@ type PsRequest struct {
 
 func (x *PsRequest) Reset() {
 	*x = PsRequest{}
-	mi := &file_daemon_proto_msgTypes[34]
+	mi := &file_daemon_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2161,7 +2517,7 @@ func (x *PsRequest) String() string {
 func (*PsRequest) ProtoMessage() {}
 
 func (x *PsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_daemon_proto_msgTypes[34]
+	mi := &file_daemon_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2174,7 +2530,7 @@ func (x *PsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PsRequest.ProtoReflect.Descriptor instead.
 func (*PsRequest) Descriptor() ([]byte, []int) {
-	return file_daemon_proto_rawDescGZIP(), []int{34}
+	return file_daemon_proto_rawDescGZIP(), []int{39}
 }
 
 var File_daemon_proto protoreflect.FileDescriptor
@@ -2289,20 +2645,47 @@ const file_daemon_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x14\n" +
 	"\x05layid\x18\x02 \x01(\tR\x05layid\x12\x1a\n" +
 	"\bprogress\x18\x03 \x01(\x03R\bprogress\x12\x14\n" +
-	"\x05total\x18\x04 \x01(\x03R\x05total\"/\n" +
+	"\x05total\x18\x04 \x01(\x03R\x05total\"p\n" +
 	"\x12RemoveImageRequest\x12\x19\n" +
-	"\bimage_id\x18\x01 \x01(\tR\aimageId\"-\n" +
+	"\bimage_id\x18\x01 \x01(\tR\aimageId\x12)\n" +
+	"\x10image_references\x18\x02 \x03(\tR\x0fimageReferences\x12\x14\n" +
+	"\x05force\x18\x03 \x01(\bR\x05force\"\x94\x01\n" +
 	"\x13RemoveImageResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"\x13\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12,\n" +
+	"\x06images\x18\x02 \x03(\v2\x14.daemon.RemovedImageR\x06images\x127\n" +
+	"\bfailures\x18\x03 \x03(\v2\x1b.daemon.ImageOperationErrorR\bfailures\"D\n" +
+	"\fRemovedImage\x12\x1c\n" +
+	"\treference\x18\x01 \x01(\tR\treference\x12\x16\n" +
+	"\x06digest\x18\x02 \x01(\tR\x06digest\"I\n" +
+	"\x13ImageOperationError\x12\x1c\n" +
+	"\treference\x18\x01 \x01(\tR\treference\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x13\n" +
 	"\x11ListImagesRequest\"B\n" +
 	"\x12ListImagesResponse\x12,\n" +
-	"\x06images\x18\x01 \x03(\v2\x14.daemon.ImageSummaryR\x06images\"l\n" +
+	"\x06images\x18\x01 \x03(\v2\x14.daemon.ImageSummaryR\x06images\"\xdf\x01\n" +
 	"\fImageSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\brepo_tag\x18\x02 \x01(\tR\arepoTag\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\tR\tcreatedAt\"\x8c\x01\n" +
+	"created_at\x18\x04 \x01(\tR\tcreatedAt\x12\x1c\n" +
+	"\treference\x18\x05 \x01(\tR\treference\x12\x16\n" +
+	"\x06digest\x18\x06 \x01(\tR\x06digest\x12#\n" +
+	"\rrootfs_digest\x18\a \x01(\tR\frootfsDigest\x12\x16\n" +
+	"\x06layers\x18\b \x03(\tR\x06layers\">\n" +
+	"\x13InspectImageRequest\x12'\n" +
+	"\x0fimage_reference\x18\x01 \x01(\tR\x0eimageReference\"?\n" +
+	"\x12PruneImagesRequest\x12\x10\n" +
+	"\x03all\x18\x01 \x01(\bR\x03all\x12\x17\n" +
+	"\adry_run\x18\x02 \x01(\bR\x06dryRun\"\xb8\x02\n" +
+	"\x13PruneImagesResponse\x12-\n" +
+	"\x12deleted_references\x18\x01 \x03(\tR\x11deletedReferences\x12+\n" +
+	"\x11deleted_manifests\x18\x02 \x03(\tR\x10deletedManifests\x12%\n" +
+	"\x0edeleted_rootfs\x18\x03 \x03(\tR\rdeletedRootfs\x12%\n" +
+	"\x0edeleted_layers\x18\x04 \x03(\tR\rdeletedLayers\x12'\n" +
+	"\x0freclaimed_bytes\x18\x05 \x01(\x03R\x0ereclaimedBytes\x12\x17\n" +
+	"\adry_run\x18\x06 \x01(\bR\x06dryRun\x125\n" +
+	"\x16quarantined_references\x18\a \x03(\tR\x15quarantinedReferences\"\x8c\x01\n" +
 	"\rAttachRequest\x12(\n" +
 	"\x04init\x18\x01 \x01(\v2\x12.daemon.AttachInitH\x00R\x04init\x12\x16\n" +
 	"\x05stdin\x18\x02 \x01(\fH\x00R\x05stdin\x12.\n" +
@@ -2347,12 +2730,14 @@ const file_daemon_proto_rawDesc = "" +
 	"\x0fRemoveContainer\x12\x15.daemon.RemoveRequest\x1a\x16.daemon.RemoveResponse\x12C\n" +
 	"\x10InspectContainer\x12\x16.daemon.InspectRequest\x1a\x17.daemon.InspectResponse\x12D\n" +
 	"\x0fAttachContainer\x12\x15.daemon.AttachRequest\x1a\x16.daemon.AttachResponse(\x010\x01\x127\n" +
-	"\x0eContainersList\x12\x11.daemon.PsRequest\x1a\x12.daemon.PsResponse2\xdc\x01\n" +
+	"\x0eContainersList\x12\x11.daemon.PsRequest\x1a\x12.daemon.PsResponse2\xe7\x02\n" +
 	"\fImageService\x12?\n" +
 	"\tPullImage\x12\x18.daemon.PullImageRequest\x1a\x16.daemon.PullImageEvent0\x01\x12F\n" +
 	"\vRemoveImage\x12\x1a.daemon.RemoveImageRequest\x1a\x1b.daemon.RemoveImageResponse\x12C\n" +
 	"\n" +
-	"ListImages\x12\x19.daemon.ListImagesRequest\x1a\x1a.daemon.ListImagesResponse2\xd3\x01\n" +
+	"ListImages\x12\x19.daemon.ListImagesRequest\x1a\x1a.daemon.ListImagesResponse\x12A\n" +
+	"\fInspectImage\x12\x1b.daemon.InspectImageRequest\x1a\x14.daemon.ImageSummary\x12F\n" +
+	"\vPruneImages\x12\x1a.daemon.PruneImagesRequest\x1a\x1b.daemon.PruneImagesResponse2\xd3\x01\n" +
 	"\x17DaemonInspectionService\x12C\n" +
 	"\n" +
 	"SystemInfo\x12\x19.daemon.SystemInfoRequest\x1a\x1a.daemon.SystemInfoResponse\x127\n" +
@@ -2372,7 +2757,7 @@ func file_daemon_proto_rawDescGZIP() []byte {
 }
 
 var file_daemon_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
+var file_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_daemon_proto_goTypes = []any{
 	(DiagnosticStatus)(0),       // 0: daemon.DiagnosticStatus
 	(*SystemInfoRequest)(nil),   // 1: daemon.SystemInfoRequest
@@ -2399,63 +2784,74 @@ var file_daemon_proto_goTypes = []any{
 	(*PullImageEvent)(nil),      // 22: daemon.PullImageEvent
 	(*RemoveImageRequest)(nil),  // 23: daemon.RemoveImageRequest
 	(*RemoveImageResponse)(nil), // 24: daemon.RemoveImageResponse
-	(*ListImagesRequest)(nil),   // 25: daemon.ListImagesRequest
-	(*ListImagesResponse)(nil),  // 26: daemon.ListImagesResponse
-	(*ImageSummary)(nil),        // 27: daemon.ImageSummary
-	(*AttachRequest)(nil),       // 28: daemon.AttachRequest
-	(*AttachInit)(nil),          // 29: daemon.AttachInit
-	(*TerminalSize)(nil),        // 30: daemon.TerminalSize
-	(*AttachResponse)(nil),      // 31: daemon.AttachResponse
-	(*ExitStatus)(nil),          // 32: daemon.ExitStatus
-	(*PsResponse)(nil),          // 33: daemon.PsResponse
-	(*ContainerListItem)(nil),   // 34: daemon.ContainerListItem
-	(*PsRequest)(nil),           // 35: daemon.PsRequest
-	nil,                         // 36: daemon.CreateRequest.EnvEntry
+	(*RemovedImage)(nil),        // 25: daemon.RemovedImage
+	(*ImageOperationError)(nil), // 26: daemon.ImageOperationError
+	(*ListImagesRequest)(nil),   // 27: daemon.ListImagesRequest
+	(*ListImagesResponse)(nil),  // 28: daemon.ListImagesResponse
+	(*ImageSummary)(nil),        // 29: daemon.ImageSummary
+	(*InspectImageRequest)(nil), // 30: daemon.InspectImageRequest
+	(*PruneImagesRequest)(nil),  // 31: daemon.PruneImagesRequest
+	(*PruneImagesResponse)(nil), // 32: daemon.PruneImagesResponse
+	(*AttachRequest)(nil),       // 33: daemon.AttachRequest
+	(*AttachInit)(nil),          // 34: daemon.AttachInit
+	(*TerminalSize)(nil),        // 35: daemon.TerminalSize
+	(*AttachResponse)(nil),      // 36: daemon.AttachResponse
+	(*ExitStatus)(nil),          // 37: daemon.ExitStatus
+	(*PsResponse)(nil),          // 38: daemon.PsResponse
+	(*ContainerListItem)(nil),   // 39: daemon.ContainerListItem
+	(*PsRequest)(nil),           // 40: daemon.PsRequest
+	nil,                         // 41: daemon.CreateRequest.EnvEntry
 }
 var file_daemon_proto_depIdxs = []int32{
 	0,  // 0: daemon.DiagnosticCheck.status:type_name -> daemon.DiagnosticStatus
 	4,  // 1: daemon.DoctorResponse.checks:type_name -> daemon.DiagnosticCheck
-	36, // 2: daemon.CreateRequest.env:type_name -> daemon.CreateRequest.EnvEntry
+	41, // 2: daemon.CreateRequest.env:type_name -> daemon.CreateRequest.EnvEntry
 	14, // 3: daemon.CreateRequest.resources:type_name -> daemon.ResourceLimits
 	15, // 4: daemon.ResourceLimits.memory:type_name -> daemon.MemoryRestriction
 	16, // 5: daemon.ResourceLimits.cpu:type_name -> daemon.CPURestriction
 	14, // 6: daemon.InspectResponse.resources:type_name -> daemon.ResourceLimits
-	27, // 7: daemon.ListImagesResponse.images:type_name -> daemon.ImageSummary
-	29, // 8: daemon.AttachRequest.init:type_name -> daemon.AttachInit
-	30, // 9: daemon.AttachRequest.resize:type_name -> daemon.TerminalSize
-	32, // 10: daemon.AttachResponse.exit:type_name -> daemon.ExitStatus
-	34, // 11: daemon.PsResponse.containers:type_name -> daemon.ContainerListItem
-	8,  // 12: daemon.ContainerService.CreateContainer:input_type -> daemon.CreateRequest
-	10, // 13: daemon.ContainerService.StartContainer:input_type -> daemon.StartRequest
-	12, // 14: daemon.ContainerService.StopContainer:input_type -> daemon.StopRequest
-	17, // 15: daemon.ContainerService.RemoveContainer:input_type -> daemon.RemoveRequest
-	19, // 16: daemon.ContainerService.InspectContainer:input_type -> daemon.InspectRequest
-	28, // 17: daemon.ContainerService.AttachContainer:input_type -> daemon.AttachRequest
-	35, // 18: daemon.ContainerService.ContainersList:input_type -> daemon.PsRequest
-	21, // 19: daemon.ImageService.PullImage:input_type -> daemon.PullImageRequest
-	23, // 20: daemon.ImageService.RemoveImage:input_type -> daemon.RemoveImageRequest
-	25, // 21: daemon.ImageService.ListImages:input_type -> daemon.ListImagesRequest
-	1,  // 22: daemon.DaemonInspectionService.SystemInfo:input_type -> daemon.SystemInfoRequest
-	3,  // 23: daemon.DaemonInspectionService.Doctor:input_type -> daemon.DoctorRequest
-	6,  // 24: daemon.DaemonInspectionService.Version:input_type -> daemon.VersionRequest
-	9,  // 25: daemon.ContainerService.CreateContainer:output_type -> daemon.CreateResponse
-	11, // 26: daemon.ContainerService.StartContainer:output_type -> daemon.StartResponse
-	13, // 27: daemon.ContainerService.StopContainer:output_type -> daemon.StopResponse
-	18, // 28: daemon.ContainerService.RemoveContainer:output_type -> daemon.RemoveResponse
-	20, // 29: daemon.ContainerService.InspectContainer:output_type -> daemon.InspectResponse
-	31, // 30: daemon.ContainerService.AttachContainer:output_type -> daemon.AttachResponse
-	33, // 31: daemon.ContainerService.ContainersList:output_type -> daemon.PsResponse
-	22, // 32: daemon.ImageService.PullImage:output_type -> daemon.PullImageEvent
-	24, // 33: daemon.ImageService.RemoveImage:output_type -> daemon.RemoveImageResponse
-	26, // 34: daemon.ImageService.ListImages:output_type -> daemon.ListImagesResponse
-	2,  // 35: daemon.DaemonInspectionService.SystemInfo:output_type -> daemon.SystemInfoResponse
-	5,  // 36: daemon.DaemonInspectionService.Doctor:output_type -> daemon.DoctorResponse
-	7,  // 37: daemon.DaemonInspectionService.Version:output_type -> daemon.VersionResponse
-	25, // [25:38] is the sub-list for method output_type
-	12, // [12:25] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	25, // 7: daemon.RemoveImageResponse.images:type_name -> daemon.RemovedImage
+	26, // 8: daemon.RemoveImageResponse.failures:type_name -> daemon.ImageOperationError
+	29, // 9: daemon.ListImagesResponse.images:type_name -> daemon.ImageSummary
+	34, // 10: daemon.AttachRequest.init:type_name -> daemon.AttachInit
+	35, // 11: daemon.AttachRequest.resize:type_name -> daemon.TerminalSize
+	37, // 12: daemon.AttachResponse.exit:type_name -> daemon.ExitStatus
+	39, // 13: daemon.PsResponse.containers:type_name -> daemon.ContainerListItem
+	8,  // 14: daemon.ContainerService.CreateContainer:input_type -> daemon.CreateRequest
+	10, // 15: daemon.ContainerService.StartContainer:input_type -> daemon.StartRequest
+	12, // 16: daemon.ContainerService.StopContainer:input_type -> daemon.StopRequest
+	17, // 17: daemon.ContainerService.RemoveContainer:input_type -> daemon.RemoveRequest
+	19, // 18: daemon.ContainerService.InspectContainer:input_type -> daemon.InspectRequest
+	33, // 19: daemon.ContainerService.AttachContainer:input_type -> daemon.AttachRequest
+	40, // 20: daemon.ContainerService.ContainersList:input_type -> daemon.PsRequest
+	21, // 21: daemon.ImageService.PullImage:input_type -> daemon.PullImageRequest
+	23, // 22: daemon.ImageService.RemoveImage:input_type -> daemon.RemoveImageRequest
+	27, // 23: daemon.ImageService.ListImages:input_type -> daemon.ListImagesRequest
+	30, // 24: daemon.ImageService.InspectImage:input_type -> daemon.InspectImageRequest
+	31, // 25: daemon.ImageService.PruneImages:input_type -> daemon.PruneImagesRequest
+	1,  // 26: daemon.DaemonInspectionService.SystemInfo:input_type -> daemon.SystemInfoRequest
+	3,  // 27: daemon.DaemonInspectionService.Doctor:input_type -> daemon.DoctorRequest
+	6,  // 28: daemon.DaemonInspectionService.Version:input_type -> daemon.VersionRequest
+	9,  // 29: daemon.ContainerService.CreateContainer:output_type -> daemon.CreateResponse
+	11, // 30: daemon.ContainerService.StartContainer:output_type -> daemon.StartResponse
+	13, // 31: daemon.ContainerService.StopContainer:output_type -> daemon.StopResponse
+	18, // 32: daemon.ContainerService.RemoveContainer:output_type -> daemon.RemoveResponse
+	20, // 33: daemon.ContainerService.InspectContainer:output_type -> daemon.InspectResponse
+	36, // 34: daemon.ContainerService.AttachContainer:output_type -> daemon.AttachResponse
+	38, // 35: daemon.ContainerService.ContainersList:output_type -> daemon.PsResponse
+	22, // 36: daemon.ImageService.PullImage:output_type -> daemon.PullImageEvent
+	24, // 37: daemon.ImageService.RemoveImage:output_type -> daemon.RemoveImageResponse
+	28, // 38: daemon.ImageService.ListImages:output_type -> daemon.ListImagesResponse
+	29, // 39: daemon.ImageService.InspectImage:output_type -> daemon.ImageSummary
+	32, // 40: daemon.ImageService.PruneImages:output_type -> daemon.PruneImagesResponse
+	2,  // 41: daemon.DaemonInspectionService.SystemInfo:output_type -> daemon.SystemInfoResponse
+	5,  // 42: daemon.DaemonInspectionService.Doctor:output_type -> daemon.DoctorResponse
+	7,  // 43: daemon.DaemonInspectionService.Version:output_type -> daemon.VersionResponse
+	29, // [29:44] is the sub-list for method output_type
+	14, // [14:29] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_daemon_proto_init() }
@@ -2463,12 +2859,12 @@ func file_daemon_proto_init() {
 	if File_daemon_proto != nil {
 		return
 	}
-	file_daemon_proto_msgTypes[27].OneofWrappers = []any{
+	file_daemon_proto_msgTypes[32].OneofWrappers = []any{
 		(*AttachRequest_Init)(nil),
 		(*AttachRequest_Stdin)(nil),
 		(*AttachRequest_Resize)(nil),
 	}
-	file_daemon_proto_msgTypes[30].OneofWrappers = []any{
+	file_daemon_proto_msgTypes[35].OneofWrappers = []any{
 		(*AttachResponse_Stdout)(nil),
 		(*AttachResponse_Stderr)(nil),
 		(*AttachResponse_Exit)(nil),
@@ -2479,7 +2875,7 @@ func file_daemon_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_daemon_proto_rawDesc), len(file_daemon_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   36,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

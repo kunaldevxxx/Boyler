@@ -6,4 +6,10 @@ type PullCommand struct {
 
 type RemoveCommand struct {
 	ImageIdentify string
+	Force         bool
+}
+
+type PruneCommand struct {
+	All    bool
+	DryRun bool
 }

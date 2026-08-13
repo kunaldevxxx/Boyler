@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"boyler/cmd/boyler/cmd/ui"
 	"bytes"
 	"strings"
 	"testing"
@@ -34,6 +35,19 @@ func TestPrintContainersDockerStyle(t *testing.T) {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("output %q does not contain %q", output.String(), expected)
 		}
+	}
+}
+
+func TestPrintContainersDoesNotUseMutedColor(t *testing.T) {
+	previousMode := colorMode.value
+	colorMode.value = ui.ColorAlways
+	t.Cleanup(func() { colorMode.value = previousMode })
+
+	var output bytes.Buffer
+	printContainers(&output, psTestResponse(), time.Now())
+
+	if strings.Contains(output.String(), "38;2;124;132;147") {
+		t.Fatalf("ps output contains muted gray styling: %q", output.String())
 	}
 }
 
@@ -165,5 +179,42 @@ func TestPullReference(t *testing.T) {
 	repository, tag, canonical = pullReference("docker.io/acme/api:v2")
 	if repository != "acme/api" || tag != "v2" || canonical != "acme/api:v2" {
 		t.Fatalf("unexpected tagged reference: %q %q %q", repository, tag, canonical)
+	}
+}
+
+func TestPrintImagesAndFilters(t *testing.T) {
+	images := []*pb.ImageSummary{
+		{Reference: "alpine:latest", Digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 1536},
+		{Reference: "library/nginx:stable", Digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Size: 2048},
+	}
+	filtered, err := filterImages(images, []string{"repository=nginx", "tag=stable"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered) != 1 || filtered[0].GetReference() != "library/nginx:stable" {
+		t.Fatalf("unexpected filter result: %#v", filtered)
+	}
+	var output bytes.Buffer
+	if err := printImages(&output, filtered, false, false, "table"); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"REPOSITORY", "library/nginx", "stable", "bbbbbbbbbbbb", "2.0KiB"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("image output %q does not contain %q", output.String(), expected)
+		}
+	}
+}
+
+func TestConfirmPruneDefaultsToNo(t *testing.T) {
+	var output bytes.Buffer
+	confirmed, err := confirmPrune(strings.NewReader("\n"), &output, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if confirmed {
+		t.Fatal("empty confirmation must not approve prune")
+	}
+	if !strings.Contains(output.String(), "not used by containers") {
+		t.Fatalf("unexpected prompt: %q", output.String())
 	}
 }

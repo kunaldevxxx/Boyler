@@ -92,21 +92,28 @@ func renderHelp(cmd *cobra.Command, _ []string) {
 	if cmd.HasAvailableSubCommands() {
 		commands := cmd.Commands()
 		sort.SliceStable(commands, func(i, j int) bool { return commands[i].Name() < commands[j].Name() })
+		printed := make(map[*cobra.Command]bool)
 		for _, group := range cmd.Groups() {
 			if !groupHasCommands(commands, group.ID) {
 				continue
 			}
 			fmt.Fprintf(output, "\n%s\n", theme.Heading(group.Title))
-			for _, subcommand := range commands {
-				if subcommand.GroupID == group.ID && subcommand.IsAvailableCommand() {
-					name := theme.Brand(subcommand.Name())
-					padding := 12 - lipgloss.Width(name)
-					if padding < 1 {
-						padding = 1
-					}
-					fmt.Fprintf(output, "  %s%s%s\n", name, strings.Repeat(" ", padding), theme.Muted(subcommand.Short))
-				}
+			groupCommands := commandsInGroup(commands, group.ID)
+			for _, subcommand := range groupCommands {
+				printed[subcommand] = true
 			}
+			printHelpCommands(output, theme, cmd, expandHelpCommands(groupCommands))
+		}
+
+		var ungrouped []*cobra.Command
+		for _, subcommand := range commands {
+			if subcommand.IsAvailableCommand() && !printed[subcommand] {
+				ungrouped = append(ungrouped, subcommand)
+			}
+		}
+		if len(ungrouped) > 0 {
+			fmt.Fprintf(output, "\n%s\n", theme.Heading("Commands"))
+			printHelpCommands(output, theme, cmd, ungrouped)
 		}
 	}
 	if cmd.Example != "" {
@@ -124,12 +131,74 @@ func renderHelp(cmd *cobra.Command, _ []string) {
 	}
 }
 
-func renderBanner(output io.Writer, theme ui.Theme) {
-	if theme.Symbol("unicode", "ascii") == "ascii" {
-		fmt.Fprintf(output, "  [==]  %s\n        %s\n\n", theme.Gradient("BOYLER"), theme.Muted("lightweight container engine"))
+func commandsInGroup(commands []*cobra.Command, groupID string) []*cobra.Command {
+	var result []*cobra.Command
+	for _, command := range commands {
+		if command.GroupID == groupID && command.IsAvailableCommand() {
+			result = append(result, command)
+		}
+	}
+	return result
+}
+
+// expandHelpCommands replaces namespace-only commands with their executable
+// children so the root help documents the actual command paths.
+func expandHelpCommands(commands []*cobra.Command) []*cobra.Command {
+	var result []*cobra.Command
+	for _, command := range commands {
+		if command.Runnable() || !command.HasAvailableSubCommands() || command.Name() == "completion" {
+			result = append(result, command)
+			continue
+		}
+		for _, child := range command.Commands() {
+			if child.IsAvailableCommand() {
+				result = append(result, child)
+			}
+		}
+	}
+	return result
+}
+
+func printHelpCommands(output io.Writer, theme ui.Theme, context *cobra.Command, commands []*cobra.Command) {
+	if len(commands) == 0 {
 		return
 	}
-	fmt.Fprintf(output, "  ╭────╮   %s\n", theme.Gradient("BOYLER"))
+	sort.SliceStable(commands, func(i, j int) bool {
+		return helpCommandName(context, commands[i]) < helpCommandName(context, commands[j])
+	})
+	width := 0
+	for _, command := range commands {
+		if value := lipgloss.Width(helpCommandName(context, command)); value > width {
+			width = value
+		}
+	}
+	for _, command := range commands {
+		plainName := helpCommandName(context, command)
+		name := theme.Brand(plainName)
+		padding := width - lipgloss.Width(name) + 3
+		if padding < 1 {
+			padding = 1
+		}
+		fmt.Fprintf(output, "  %s%s%s\n", name, strings.Repeat(" ", padding), theme.Muted(command.Short))
+	}
+}
+
+func helpCommandName(context, command *cobra.Command) string {
+	if command.Parent() == context {
+		return command.Name()
+	}
+	if command.Parent() != nil && command.Parent().Parent() == context {
+		return command.Parent().Name() + " " + command.Name()
+	}
+	return command.CommandPath()
+}
+
+func renderBanner(output io.Writer, theme ui.Theme) {
+	if theme.Symbol("unicode", "ascii") == "ascii" {
+		fmt.Fprintf(output, "  [==]  %s\n        %s\n\n", theme.Brand("BOYLER"), theme.Muted("lightweight container engine"))
+		return
+	}
+	fmt.Fprintf(output, "  ╭────╮   %s\n", theme.Brand("BOYLER"))
 	fmt.Fprintf(output, "  │ ≋≋ │   %s\n", theme.Muted("lightweight container engine"))
 	fmt.Fprintln(output, "  ╰─┬──╯")
 	fmt.Fprintln(output, "    ╵")

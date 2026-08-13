@@ -2,6 +2,7 @@ package image
 
 import (
 	"archive/tar"
+	"boyler/internal/daemon/core"
 	"boyler/internal/daemon/infrastructure/outbound/layer"
 	"boyler/pkg/files"
 	"bytes"
@@ -9,12 +10,36 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestImageManagerResolveMissingImageReturnsDomainError(t *testing.T) {
+	manager := NewImageManager(t.TempDir())
+
+	_, err := manager.Resolve(context.Background(), "golang")
+	if !errors.Is(err, core.ErrImageNotFound) {
+		t.Fatalf("Resolve error = %v, want ErrImageNotFound", err)
+	}
+	if !strings.Contains(err.Error(), "golang:latest") {
+		t.Fatalf("Resolve error = %q, want canonical reference", err)
+	}
+	if strings.Contains(err.Error(), layersInfoFileName) {
+		t.Fatalf("Resolve leaked storage details: %v", err)
+	}
+}
+
+func TestImageManagerDeleteMissingImageRemainsIdempotent(t *testing.T) {
+	manager := NewImageManager(t.TempDir())
+
+	if err := manager.Delete(context.Background(), "golang"); err != nil {
+		t.Fatalf("Delete missing image returned an error: %v", err)
+	}
+}
 
 func TestImageManagerExtractsContentAddressedLayers(t *testing.T) {
 	imagesRoot := t.TempDir()
@@ -181,7 +206,7 @@ func TestImageManagerPruneUsesImageMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := manager.Prune(context.Background()); err != nil {
+	if _, err := manager.Prune(context.Background(), core.ImageUsage{}, core.ImagePruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if valid, _ := layerStore.Has(context.Background(), used); !valid {
@@ -244,6 +269,50 @@ func TestImageStoreKeepsImmutableRootfsWhenTagChanges(t *testing.T) {
 	}
 }
 
+func TestExtractUsesCommittedImageMetadataAfterInterruptedTagUpdate(t *testing.T) {
+	imagesRoot := t.TempDir()
+	layerStore := layer.NewFilesystemStore(imagesRoot)
+	manager := NewImageManagerWithLayerStore(imagesRoot, layerStore)
+	oldArchive := tarGzipLayer(t, "version", "old")
+	newArchive := tarGzipLayer(t, "version", "new")
+	oldLayer, newLayer := imageLayerDescriptor(oldArchive), imageLayerDescriptor(newArchive)
+	for _, item := range []struct {
+		descriptor layer.Descriptor
+		contents   []byte
+	}{{oldLayer, oldArchive}, {newLayer, newArchive}} {
+		if _, err := layerStore.Ensure(context.Background(), item.descriptor, bytesFetch(item.contents), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	referenceDir := filepath.Join(imagesRoot, "moving%3Alatest")
+	if err := os.MkdirAll(referenceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	store := newImageStore(imagesRoot)
+	oldInfo := layersInfo{SchemaVersion: 2, ManifestDigest: "sha256:" + strings.Repeat("1", 64), Layers: []layer.Descriptor{oldLayer}}
+	if err := store.writeLayersInfo(referenceDir, oldInfo); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.writeImageMetadata(referenceDir, "moving:latest", oldInfo); err != nil {
+		t.Fatal(err)
+	}
+	newInfo := layersInfo{SchemaVersion: 2, ManifestDigest: "sha256:" + strings.Repeat("2", 64), Layers: []layer.Descriptor{newLayer}}
+	if err := store.writeLayersInfo(referenceDir, newInfo); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := manager.Extract(context.Background(), "moving:latest", imagesRoot); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(filepath.Join(referenceDir, "rootfs", "version"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "old" {
+		t.Fatalf("extracted interrupted update %q, want old committed image", contents)
+	}
+}
+
 func TestImageManagerDeleteRejectsUnsafeName(t *testing.T) {
 	imagesRoot := t.TempDir()
 	outside := filepath.Join(filepath.Dir(imagesRoot), "must-not-delete")
@@ -257,6 +326,115 @@ func TestImageManagerDeleteRejectsUnsafeName(t *testing.T) {
 	}
 	if _, err := os.Stat(outside); err != nil {
 		t.Fatalf("outside directory was affected: %v", err)
+	}
+}
+
+func TestPrunePreservesManifestOwnedByContainerAfterReferenceRemoval(t *testing.T) {
+	imagesRoot := t.TempDir()
+	layerStore := layer.NewFilesystemStore(imagesRoot)
+	manager := NewImageManagerWithLayerStore(imagesRoot, layerStore)
+	contents := []byte("container-owned-layer")
+	descriptor := imageLayerDescriptor(contents)
+	if _, err := layerStore.Ensure(context.Background(), descriptor, bytesFetch(contents), nil); err != nil {
+		t.Fatal(err)
+	}
+	digest := "sha256:" + strings.Repeat("c", 64)
+	storageName, _ := StorageName("alpine:latest")
+	referenceDir := filepath.Join(imagesRoot, storageName)
+	if err := os.MkdirAll(referenceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	info := layersInfo{SchemaVersion: 2, ManifestDigest: digest, Layers: []layer.Descriptor{descriptor}}
+	store := newImageStore(imagesRoot)
+	if err := store.writeLayersInfo(referenceDir, info); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.writeImageMetadata(referenceDir, "alpine:latest", info); err != nil {
+		t.Fatal(err)
+	}
+	rootfs, _ := manager.GetRootfsPathByDigest(digest)
+	if err := os.MkdirAll(rootfs, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rootfs, "marker"), []byte("kept"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := manager.Remove(context.Background(), "alpine:latest"); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Prune(context.Background(), core.ImageUsage{ManifestDigests: map[string]struct{}{digest: {}}}, core.ImagePruneOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.DeletedManifests) != 0 || len(result.DeletedRootfs) != 0 || len(result.DeletedLayers) != 0 {
+		t.Fatalf("container-owned image data was selected for prune: %#v", result)
+	}
+	if _, err := os.Stat(filepath.Join(rootfs, "marker")); err != nil {
+		t.Fatalf("rootfs was pruned: %v", err)
+	}
+	if valid, err := layerStore.Has(context.Background(), descriptor); err != nil || !valid {
+		t.Fatalf("layer was pruned: valid=%v err=%v", valid, err)
+	}
+}
+
+func TestPruneDryRunReportsButDoesNotDeleteOrphans(t *testing.T) {
+	imagesRoot := t.TempDir()
+	layerStore := layer.NewFilesystemStore(imagesRoot)
+	manager := NewImageManagerWithLayerStore(imagesRoot, layerStore)
+	contents := []byte("orphan")
+	descriptor := imageLayerDescriptor(contents)
+	if _, err := layerStore.Ensure(context.Background(), descriptor, bytesFetch(contents), nil); err != nil {
+		t.Fatal(err)
+	}
+	digest := "sha256:" + strings.Repeat("d", 64)
+	info := layersInfo{SchemaVersion: 2, ManifestDigest: digest, Layers: []layer.Descriptor{descriptor}}
+	if err := newImageStore(imagesRoot).writeManifestInfo(strings.Repeat("d", 64), info); err != nil {
+		t.Fatal(err)
+	}
+	rootfs, _ := manager.GetRootfsPathByDigest(digest)
+	if err := os.MkdirAll(rootfs, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := manager.Prune(context.Background(), core.ImageUsage{}, core.ImagePruneOptions{DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.DeletedManifests) != 1 || len(result.DeletedRootfs) != 1 || len(result.DeletedLayers) != 1 {
+		t.Fatalf("unexpected dry-run result: %#v", result)
+	}
+	if _, err := os.Stat(rootfs); err != nil {
+		t.Fatalf("dry-run removed rootfs: %v", err)
+	}
+	if valid, err := layerStore.Has(context.Background(), descriptor); err != nil || !valid {
+		t.Fatalf("dry-run removed layer: valid=%v err=%v", valid, err)
+	}
+}
+
+func TestPruneQuarantinesUnreadableReference(t *testing.T) {
+	imagesRoot := t.TempDir()
+	manager := NewImageManager(imagesRoot)
+	corrupt := filepath.Join(imagesRoot, "broken%3Alatest")
+	if err := os.MkdirAll(corrupt, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corrupt, layersInfoFileName), []byte("not-json"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Prune(context.Background(), core.ImageUsage{}, core.ImagePruneOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.QuarantinedReferences) != 1 || result.QuarantinedReferences[0] != "broken%3Alatest" {
+		t.Fatalf("unexpected quarantine result: %#v", result)
+	}
+	if _, err := os.Stat(corrupt); !os.IsNotExist(err) {
+		t.Fatalf("corrupt reference was not moved: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(imagesRoot, ".quarantine"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("quarantine contents: entries=%v err=%v", entries, err)
 	}
 }
 

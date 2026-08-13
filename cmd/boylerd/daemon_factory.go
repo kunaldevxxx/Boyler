@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	service "boyler/internal/daemon/application/container_service"
@@ -35,9 +36,11 @@ type DaemonConfig struct {
 }
 
 type SharedManager struct {
-	FS     overlay.VolumeManager
-	Image  image.ImageManager
-	Layers layer.Store
+	FS             overlay.VolumeManager
+	Image          image.ImageManager
+	Layers         layer.Store
+	Store          *storage.ContainerRepository
+	ImageLifecycle *sync.RWMutex
 }
 
 type DaemonFactory struct {
@@ -50,9 +53,11 @@ func NewDaemonFactory(config DaemonConfig) *DaemonFactory {
 	return &DaemonFactory{
 		config: config,
 		shared: SharedManager{
-			FS:     overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
-			Image:  image.NewImageManagerWithLayerStore(config.ImagesPath, layers),
-			Layers: layers,
+			FS:             overlay.NewOverlayManager(config.ImagesPath, config.ContainersPath),
+			Image:          image.NewImageManagerWithLayerStore(config.ImagesPath, layers),
+			Layers:         layers,
+			Store:          storage.NewContainerRepository(),
+			ImageLifecycle: &sync.RWMutex{},
 		},
 	}
 }
@@ -111,25 +116,27 @@ func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) 
 	}
 
 	return service.NewContainerService(service.Deps{
-		Runtime:       runtime.NewMyRunc(d.config.RuntimeBinPath),
-		FS:            d.shared.FS,
-		Images:        d.shared.Image,
-		Network:       networkService,
-		Reg:           registry.NewRepo(),
-		Store:         storage.NewContainerRepository(),
-		Logger:        logger.InitLogger(false),
-		CgroupFactory: limits.NewFactory(),
-		Conf:          d.config.Service,
+		Runtime:        runtime.NewMyRunc(d.config.RuntimeBinPath),
+		FS:             d.shared.FS,
+		Images:         d.shared.Image,
+		Network:        networkService,
+		Reg:            registry.NewRepo(),
+		Store:          d.shared.Store,
+		Logger:         logger.InitLogger(false),
+		CgroupFactory:  limits.NewFactory(),
+		Conf:           d.config.Service,
+		ImageLifecycle: d.shared.ImageLifecycle,
 	}), nil
 }
 
 func (d *DaemonFactory) NewImageService() (imageservice.ImageService, error) {
 	return imageservice.NewImageService(
-		imageservice.ImageSerivceConfig{
-			UnpackDir: d.config.Service.UnpackDir,
+		imageservice.ImageServiceConfig{
+			ContainersDir: d.config.ContainersPath,
 		},
 		d.shared.Image,
-		d.shared.FS,
+		d.shared.Store,
+		d.shared.ImageLifecycle,
 	), nil
 }
 

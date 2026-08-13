@@ -45,7 +45,6 @@ func (vm *overlayManager) CreateMountPoints(ctx context.Context, containerID str
 }
 
 func (vm *overlayManager) Mount(ctx context.Context, containerID string, imageName string) error {
-	log := logger.FromContext(ctx)
 	safeName, err := image_store.StorageName(imageName)
 	if err != nil {
 		return err
@@ -58,7 +57,20 @@ func (vm *overlayManager) Mount(ctx context.Context, containerID string, imageNa
 			lowerDir = filepath.Join(vm.imageDir, legacyName, "rootfs")
 		}
 	}
-	log.Debug("start mount", "containerID", containerID, "imageName", safeName)
+	return vm.MountRootfs(ctx, containerID, lowerDir)
+}
+
+func (vm *overlayManager) MountRootfs(ctx context.Context, containerID string, rootfsPath string) error {
+	log := logger.FromContext(ctx)
+	lowerDir := filepath.Clean(rootfsPath)
+	if !filepath.IsAbs(lowerDir) {
+		absolute, err := filepath.Abs(lowerDir)
+		if err != nil {
+			return fmt.Errorf("resolve rootfs path: %w", err)
+		}
+		lowerDir = absolute
+	}
+	log.Debug("start immutable rootfs mount", "containerID", containerID, "rootfs", lowerDir)
 	containerPath := filepath.Join(vm.containerDir, containerID)
 
 	mergedDir := filepath.Join(containerPath, "merged")
@@ -68,8 +80,8 @@ func (vm *overlayManager) Mount(ctx context.Context, containerID string, imageNa
 		return err
 	}
 
-	opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", filepath.Clean(lowerDir), filepath.Clean(upperDir), filepath.Clean(workDir))
-	err = syscall.Mount("overlay", mergedDir, "overlay", 0, opts)
+	opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, filepath.Clean(upperDir), filepath.Clean(workDir))
+	err := syscall.Mount("overlay", mergedDir, "overlay", 0, opts)
 
 	if err != nil {
 		return err

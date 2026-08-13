@@ -2,6 +2,7 @@ package image
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 )
@@ -24,8 +25,6 @@ func parseDockerHubReference(value string) (dockerHubReference, error) {
 	}, nil
 }
 
-// StorageName returns an injective, filesystem-safe key for a Docker Hub
-// reference. Equivalent spellings such as alpine and alpine:latest share it.
 func StorageName(value string) (string, error) {
 	canonical, _, _, err := canonicalDockerHubReference(value)
 	if err != nil {
@@ -34,8 +33,6 @@ func StorageName(value string) (string, error) {
 	return encodeStorageName(canonical), nil
 }
 
-// LegacyStorageName supports images downloaded before injective reference
-// encoding was introduced.
 func LegacyStorageName(value string) (string, error) {
 	value = strings.TrimPrefix(value, "docker.io/")
 	if err := validateReferenceText(value); err != nil {
@@ -100,4 +97,16 @@ func encodeStorageName(value string) string {
 		builder.WriteByte(hex[char&15])
 	}
 	return builder.String()
+}
+
+func decodeStorageName(value string) (string, error) {
+	reference, err := url.PathUnescape(value)
+	if err != nil {
+		return "", fmt.Errorf("decode image storage name %q: %w", value, err)
+	}
+	canonical, _, _, err := canonicalDockerHubReference(reference)
+	if err != nil || encodeStorageName(canonical) != value {
+		return "", fmt.Errorf("invalid encoded image storage name %q", value)
+	}
+	return canonical, nil
 }
