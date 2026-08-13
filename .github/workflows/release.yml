@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish Linux amd64 release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: ${GITHUB_REF_NAME}" >&2
+            echo "Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-PRERELEASE" >&2
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Verify dependencies
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+
+      - name: Run checks
+        run: |
+          set -euo pipefail
+          go vet ./cmd/... ./internal/... ./pkg/...
+          go test -race -count=1 ./cmd/... ./internal/... ./pkg/...
+
+      - name: Build release binaries
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME}"
+          build_date="$(git show -s --format=%cI "${GITHUB_SHA}")"
+          ldflags="-s -w -X boyler/internal/version.Version=${version} -X boyler/internal/version.Commit=${GITHUB_SHA} -X boyler/internal/version.BuildDate=${build_date}"
+
+          mkdir -p build
+          go build -trimpath -ldflags "${ldflags}" -o build/boyler ./cmd/boyler
+          go build -trimpath -ldflags "${ldflags}" -o build/myrunc ./cmd/myrunc
+          go build -trimpath -ldflags "${ldflags}" -o build/daemon_boyler_linux ./cmd/boylerd
+
+      - name: Package release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_name="boyler-${GITHUB_REF_NAME}-linux-amd64"
+          package_dir="package/${package_name}"
+          archive="dist/${package_name}.tar.gz"
+          source_date_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
+
+          mkdir -p "${package_dir}" dist
+          install -m 0755 build/boyler "${package_dir}/boyler"
+          install -m 0755 build/myrunc "${package_dir}/myrunc"
+          install -m 0755 build/daemon_boyler_linux "${package_dir}/daemon_boyler_linux"
+          install -m 0644 LICENSE "${package_dir}/LICENSE"
+
+          tar \
+            --sort=name \
+            --mtime="@${source_date_epoch}" \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C package \
+            -cf - \
+            "${package_name}" | gzip -n > "${archive}"
+
+          (
+            cd dist
+            sha256sum "${package_name}.tar.gz" > SHA256SUMS
+          )
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/*
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-verification.md <<EOF
+          Linux amd64 release containing the Boyler CLI, daemon and runtime.
+
+          Verify the checksum after downloading the release files:
+
+          \`sha256sum --check SHA256SUMS\`
+
+          Verify cryptographic build provenance with GitHub CLI:
+
+          \`gh attestation verify boyler-${GITHUB_REF_NAME}-linux-amd64.tar.gz --repo ${GITHUB_REPOSITORY}\`
+          EOF
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          flags=(
+            --verify-tag
+            --generate-notes
+            --notes-file release-verification.md
+            --title "Boyler ${GITHUB_REF_NAME}"
+          )
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+
+          gh release create \
+            "${GITHUB_REF_NAME}" \
+            dist/*.tar.gz \
+            dist/SHA256SUMS \
+            "${flags[@]}"

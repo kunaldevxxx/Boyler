@@ -43,10 +43,9 @@ var psCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		resp, err := client.ContainersList(
-			context.Background(),
-			&pb.PsRequest{},
-		)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
+		defer cancel()
+		resp, err := client.ContainersList(ctx, &pb.PsRequest{})
 		if err != nil {
 			return commandError(err)
 		}

@@ -39,7 +39,7 @@ var daemonStatusCmd = &cobra.Command{
 	Use: "status", Short: "Check whether the Boyler daemon is healthy", Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		loadEnv()
-		ctx, cancel := context.WithTimeout(cmd.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 		defer cancel()
 		status := inspectDaemon(ctx)
 		if daemonStatusJSON {

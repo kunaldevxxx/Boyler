@@ -8,7 +8,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"boyler/cmd/boyler/cmd/ui"
 	pb "boyler/internal/daemon/infrastructure/inbound/api/grpc/gen"
@@ -52,7 +51,7 @@ var doctorCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		loadEnv()
-		ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), daemonRequestTimeout)
 		defer cancel()
 		report := runDoctorChecks(ctx)
 		if doctorJSON {
