@@ -9,6 +9,7 @@ LDFLAGS = -s -w -X boyler/internal/version.Version=$(VERSION) -X boyler/internal
 compile:
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/boyler ./cmd/boyler
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/myrunc ./cmd/myrunc
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/boyler-shim ./cmd/boyler-shim
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/daemon_boyler_$(OS) ./cmd/boylerd
 	@echo "Binary files was created"
 
