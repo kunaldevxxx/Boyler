@@ -19,7 +19,9 @@ import (
 	registry "boyler/internal/daemon/infrastructure/outbound/registry"
 	storage "boyler/internal/daemon/infrastructure/outbound/storage/in-memory"
 	systeminspector "boyler/internal/daemon/infrastructure/outbound/system"
-	runtime "boyler/internal/runtime/myrunc"
+	run "boyler/internal/runtime"
+	runtimemyrunc "boyler/internal/runtime/myrunc"
+	runtimeshim "boyler/internal/runtime/shim"
 	"boyler/pkg/logger"
 )
 
@@ -115,8 +117,15 @@ func (d *DaemonFactory) NewContainerService() (service.ContainerService, error) 
 		return nil, fmt.Errorf("create network service: %w", err)
 	}
 
+	var rt run.Runtime
+	if d.config.ShimBinPath != "" && d.config.StatePath != "" {
+		rt = runtimeshim.NewClient(d.config.ShimBinPath, d.config.StatePath, d.config.RuntimeBinPath)
+	} else {
+		rt = runtimemyrunc.NewMyRunc(d.config.RuntimeBinPath)
+	}
+
 	return service.NewContainerService(service.Deps{
-		Runtime:        runtime.NewMyRunc(d.config.RuntimeBinPath),
+		Runtime:        rt,
 		FS:             d.shared.FS,
 		Images:         d.shared.Image,
 		Network:        networkService,
