@@ -2,14 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 )
 
-// ipcRequest and ipcResponse are the wire types for daemon <-> shim IPC.
-// They deliberately mirror internal/runtime/shim.{Request,Response} so both
-// sides decode the same JSON without a shared import.
 type ipcRequest struct {
 	Cmd    string `json:"cmd"`
 	Signal string `json:"signal,omitempty"`
@@ -20,8 +18,6 @@ type ipcResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-// server listens on the shim Unix socket and dispatches daemon commands to the
-// container manager. It is the long-running loop of the shim process.
 type server struct {
 	mgr *manager
 }
@@ -30,12 +26,10 @@ func newServer(mgr *manager) *server {
 	return &server{mgr: mgr}
 }
 
-// run creates the container, starts the socket listener, then serves requests
-// until the socket is explicitly closed (on delete).
 func (s *server) run() error {
 	if err := s.mgr.create(); err != nil {
-		s.mgr.writeErrorState(err)
-		return fmt.Errorf("create container: %w", err)
+		stateErr := s.mgr.writeErrorState(err)
+		return errors.Join(fmt.Errorf("create container: %w", err), stateErr)
 	}
 
 	_ = os.Remove(s.mgr.sockPath)
@@ -48,15 +42,12 @@ func (s *server) run() error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			// Accept fails when ln is closed (delete path); treat as clean exit.
 			return nil
 		}
 		s.handleConn(conn, ln)
 	}
 }
 
-// handleConn processes a single daemon request synchronously. Delete closes
-// the listener so the serve loop exits after this call returns.
 func (s *server) handleConn(conn net.Conn, ln net.Listener) {
 	defer conn.Close()
 
@@ -84,10 +75,14 @@ func (s *server) handleConn(conn net.Conn, ln net.Listener) {
 		}
 
 	case "delete":
+		if err := s.mgr.delete(); err != nil {
+			resp.Error = err.Error()
+			_ = json.NewEncoder(conn).Encode(resp)
+			return
+		}
 		resp.OK = true
 		_ = json.NewEncoder(conn).Encode(resp)
-		s.mgr.delete()
-		ln.Close() // unblock Accept → clean exit
+		ln.Close()
 		return
 
 	default:

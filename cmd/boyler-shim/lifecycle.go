@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-// myruncStateFile is the state written by myrunc to its own state directory.
+const watchInterval = 500 * time.Millisecond
+
 type myruncStateFile struct {
 	ID         string `json:"id"`
 	PID        int    `json:"pid"`
@@ -21,14 +22,13 @@ type myruncStateFile struct {
 	BundlePath string `json:"bundle"`
 }
 
-// manager owns the full lifecycle of one container on behalf of the daemon.
 type manager struct {
 	id         string
 	bundlePath string
 	myruncPath string
 	shimDir    string
-	statePath  string // absolute path to shim.json
-	sockPath   string // absolute path to shim.sock
+	statePath  string
+	sockPath   string
 
 	pid     int
 	stopped atomic.Bool
@@ -46,8 +46,6 @@ func newManager(id, bundlePath, myruncPath, stateDir string) *manager {
 	}
 }
 
-// create calls myrunc create, reads the resulting PID, and persists an
-// initial shim.json with status="created".
 func (m *manager) create() error {
 	if err := os.MkdirAll(m.shimDir, 0755); err != nil {
 		return fmt.Errorf("create shim dir: %w", err)
@@ -75,7 +73,6 @@ func (m *manager) create() error {
 	})
 }
 
-// readMyruncPID reads the PID from myrunc's own state.json file.
 func (m *manager) readMyruncPID() (int, error) {
 	myruncStateDir := os.Getenv("STATE_PATH_MYRUNC")
 	if myruncStateDir == "" {
@@ -93,8 +90,6 @@ func (m *manager) readMyruncPID() (int, error) {
 	return st.PID, nil
 }
 
-// run signals the container to start (myrunc run writes to the go.fifo pipe),
-// then updates shim.json to "running".
 func (m *manager) run() error {
 	cmd := exec.Command(m.myruncPath, "run", m.id)
 	cmd.Stderr = os.Stderr
@@ -104,7 +99,6 @@ func (m *manager) run() error {
 	return m.updateStatus("running")
 }
 
-// kill sends a signal to the container via myrunc.
 func (m *manager) kill(signal string) error {
 	cmd := exec.Command(m.myruncPath, "kill", m.id, signal)
 	cmd.Stdout = os.Stdout
@@ -115,30 +109,30 @@ func (m *manager) kill(signal string) error {
 	return nil
 }
 
-// delete calls myrunc delete and removes the shim directory. Best-effort on
-// each step so cleanup proceeds even after partial failures.
-func (m *manager) delete() {
+func (m *manager) delete() error {
 	cmd := exec.Command(m.myruncPath, "delete", m.id)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
-	_ = os.RemoveAll(m.shimDir)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("myrunc delete: %w", err)
+	}
+	if err := os.RemoveAll(m.shimDir); err != nil {
+		return fmt.Errorf("remove shim dir: %w", err)
+	}
+	return nil
 }
 
-// writeErrorState records a terminal error in shim.json so the daemon can
-// surface the failure instead of polling indefinitely.
-func (m *manager) writeErrorState(err error) {
-	_ = writeState(m.statePath, shimState{
+func (m *manager) writeErrorState(cause error) error {
+	return writeState(m.statePath, shimState{
 		ID:         m.id,
 		Status:     "error",
 		BundlePath: m.bundlePath,
 		SocketPath: m.sockPath,
 		StartedAt:  time.Now(),
-		ErrorMsg:   err.Error(),
+		ErrorMsg:   cause.Error(),
 	})
 }
 
-// updateStatus reads the current shim.json and writes it back with a new status.
 func (m *manager) updateStatus(status string) error {
 	data, err := os.ReadFile(m.statePath)
 	if err != nil {
@@ -152,17 +146,17 @@ func (m *manager) updateStatus(status string) error {
 	return writeState(m.statePath, st)
 }
 
-// watchContainer polls the container PID every 500 ms. When the process
-// disappears it updates shim.json to "stopped".
 func (m *manager) watchContainer() {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(watchInterval)
 	defer ticker.Stop()
 	for range ticker.C {
 		if m.stopped.Load() {
 			return
 		}
 		if !processAlive(m.pid) {
-			_ = m.updateStatus("stopped")
+			if err := m.updateStatus("stopped"); err != nil {
+				return
+			}
 			m.stopped.Store(true)
 			return
 		}
@@ -187,7 +181,7 @@ func processAlive(pid int) bool {
 			return false
 		}
 		if errno == syscall.EPERM {
-			return true // process exists but we lack permission to signal it
+			return true
 		}
 	}
 	return false
